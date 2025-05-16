@@ -1390,7 +1390,8 @@ app.post('/api/tickets/:ticketNumber/messages', verifyToken, upload.array('attac
                     threadId: ticket.email_thread_id,
                     userId: userId,
                     saveToDb: true,
-                    attachments: attachments
+                    attachments: attachments,
+                    ticketNumber: ticketNumber
                 }
             );
         } catch (emailError) {
