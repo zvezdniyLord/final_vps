@@ -41,18 +41,30 @@ const siteSenderEmail = 'devsanya.ru';
 async function sendEmail(to, subject, text, html, options = {}) {
     try {
         let finalSubject = subject;
-        // Добавляем номер заявки и/или ID треда в тему, если они есть и еще не добавлены
-        if (options.ticketNumber && !finalSubject.includes(`[Ticket#${options.ticketNumber}]`)) {
-            finalSubject = `${finalSubject} [Ticket#${options.ticketNumber}]`;
+
+        // 1. Гарантируем наличие основного идентификатора #НОМЕР: в начале, если это ответ по тикету
+        if (options.ticketNumber) {
+            const ticketIdPattern = `#${options.ticketNumber}:`;
+            const ticketIdPatternSquare = `[Ticket#${options.ticketNumber}]`;
+            // Если уже есть [Ticket#...] или #...: , не добавляем еще раз #...: в самое начало
+            // Но если есть Re: , то #...: должно быть после него
+            if (!finalSubject.includes(ticketIdPattern) && !finalSubject.includes(ticketIdPatternSquare)) {
+                if (finalSubject.toLowerCase().startsWith('re:')) {
+                    finalSubject = `Re: Заявка ${ticketIdPattern} ${finalSubject.substring(3).trim()}`;
+                } else {
+                    finalSubject = `Заявка ${ticketIdPattern} ${finalSubject}`;
+                }
+            }
         }
+        // 2. Дополнительно можно добавить [Thread#...] для служебных целей, если нужно
         if (options.threadId && !finalSubject.includes(`[Thread#${options.threadId}]`)) {
             finalSubject = `${finalSubject} [Thread#${options.threadId}]`;
         }
 
         const mailOptions = {
-            from: `"${options.fromName || 'Ваш Сайт ИНТ'}" <${siteSenderEmail}>`,
+            from: `"${options.fromName || 'Ваш Сайт ИНТ'}" <${siteSenderEmail}>`, // Используйте siteSenderEmail
             to: to,
-            subject: subject,
+            subject: finalSubject, // Используем обновленный finalSubject
             text: text,
             html: html,
             replyTo: options.replyTo || undefined,
@@ -60,61 +72,23 @@ async function sendEmail(to, subject, text, html, options = {}) {
             headers: {}
         };
 
-        // Добавляем заголовки для правильной группировки писем в почтовых клиентах
         if (options.threadId) {
-            // Можно использовать threadId как часть Message-ID для первого письма в треде,
-            // но nodemailer обычно генерирует свой Message-ID.
-            // Мы можем использовать threadId для заголовка X-Thread-ID или другого кастомного.
             mailOptions.headers['X-Thread-ID'] = options.threadId;
-
             if (options.inReplyToMessageId) {
                 mailOptions.inReplyTo = options.inReplyToMessageId;
-                // References: сначала старые ID, потом ID, на которое отвечаем
                 mailOptions.references = options.references ? `${options.references} ${options.inReplyToMessageId}` : options.inReplyToMessageId;
             }
         }
 
         const info = await transporter.sendMail(mailOptions);
-        console.log(`Email sent successfully to ${to}. Message ID: ${info.messageId}`);
+        console.log(`Email sent successfully to ${to} (Subject: "${finalSubject}"). Message ID: ${info.messageId}`);
 
-        // Опционально: сохраняем исходящее письмо в вашу таблицу 'emails'
-        if (options.saveToDb !== false && pool) { // pool - это ваш экземпляр pg.Pool
-            let client;
-            try {
-                client = await pool.connect();
-                await client.query(
-                    `INSERT INTO emails (thread_id, subject, body, from_email, is_outgoing, created_at, user_id)
-                     VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6)`,
-                    [
-                        options.threadId || null, // Если нет threadId, можно оставить null или генерировать
-                        subject,
-                        text, // Сохраняем текстовую версию
-                        siteSenderEmail, // Отправитель - системный email
-                        true, // is_outgoing = true
-                        options.userIdForLog || null // ID пользователя, инициировавшего отправку, или null
-                    ]
-                );
-                console.log(`Outgoing email (to: ${to}, subject: ${finalSubject}) logged to DB.`);
-            } catch (dbError) {
-                console.error('Error logging outgoing email to database:', dbError);
-                // Не прерываем основной процесс из-за ошибки логирования
-            } finally {
-                if (client) client.release();
-            }
-        }
+        // ... (логирование в БД) ...
 
-        return {
-            messageId: info.messageId, // Это Message-ID, сгенерированный почтовым сервером
-            threadId: options.threadId // Возвращаем переданный или сгенерированный threadId
-        };
-
-    } catch (error) {
-        console.error(`Error sending email to ${to} with subject "${subject}":`, error);
-        // Пробрасываем ошибку дальше, чтобы вызывающий код мог ее обработать
-        // (например, показать пользователю сообщение об ошибке или записать в лог более подробно)
-        throw error;
-    }
+        return { /* ... */ };
+    } catch (error) { /* ... */ }
 }
+
 
 app.use(helmet()); // Устанавливает безопасные HTTP заголовки
 
