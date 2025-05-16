@@ -40,31 +40,81 @@ const siteSenderEmail = 'devsanya.ru';
 
 async function sendEmail(to, subject, text, html, options = {}) {
     try {
-        let finalSubject = subject;
+        let baseSubject = subject; // Исходная тема, с которой работаем
+        let finalSubject = subject; // Тема, которая пойдет в письмо
 
-        // 1. Гарантируем наличие основного идентификатора #НОМЕР: в начале, если это ответ по тикету
+        // 1. Формирование темы с идентификатором тикета
         if (options.ticketNumber) {
-            const ticketIdPattern = `#${options.ticketNumber}:`;
-            const ticketIdPatternSquare = `[Ticket#${options.ticketNumber}]`;
-            // Если уже есть [Ticket#...] или #...: , не добавляем еще раз #...: в самое начало
-            // Но если есть Re: , то #...: должно быть после него
-            if (!finalSubject.includes(ticketIdPattern) && !finalSubject.includes(ticketIdPatternSquare)) {
-                if (finalSubject.toLowerCase().startsWith('re:')) {
-                    finalSubject = `Re: Заявка ${ticketIdPattern} ${finalSubject.substring(3).trim()}`;
+            const ticketIdMarker = `#${options.ticketNumber}:`; // Основной маркер
+            const ticketIdMarkerSquare = `[Ticket#${options.ticketNumber}]`; // Альтернативный маркер
+            const ticketIdPatternForRe = `Заявка ${ticketIdMarker}`; // Как это должно выглядеть в теме
+
+            const subjectLower = baseSubject.toLowerCase();
+            const isRe = subjectLower.startsWith('re:');
+
+            // Проверяем, содержит ли тема уже наш основной маркер
+            if (!baseSubject.includes(ticketIdMarker)) {
+                // Основного маркера нет. Проверяем, есть ли альтернативный
+                if (baseSubject.includes(ticketIdMarkerSquare)) {
+                    // Есть [Ticket#...], но нет #...:
+                    // Заменяем [Ticket#...] на "Заявка #...:" или добавляем, если это "Re:"
+                    if (isRe) {
+                        let subjectWithoutRe = baseSubject.substring(3).trim();
+                        // Убираем старый [Ticket#...] перед добавлением нового формата
+                        subjectWithoutRe = subjectWithoutRe.replace(ticketIdMarkerSquare, '').trim();
+                        finalSubject = `Re: ${ticketIdPatternForRe} ${subjectWithoutRe}`.replace(/\s\s+/g, ' ').trim(); // Убираем лишние пробелы
+                    } else {
+                        // Убираем старый [Ticket#...] перед добавлением нового формата
+                        baseSubject = baseSubject.replace(ticketIdMarkerSquare, '').trim();
+                        finalSubject = `${ticketIdPatternForRe} ${baseSubject}`.replace(/\s\s+/g, ' ').trim();
+                    }
                 } else {
-                    finalSubject = `Заявка ${ticketIdPattern} ${finalSubject}`;
+                    // Нет ни основного, ни альтернативного маркера. Добавляем основной.
+                    if (isRe) {
+                        const subjectWithoutRe = baseSubject.substring(3).trim();
+                        finalSubject = `Re: ${ticketIdPatternForRe} ${subjectWithoutRe}`;
+                    } else {
+                        finalSubject = `${ticketIdPatternForRe} ${baseSubject}`;
+                    }
+                }
+            } else {
+                // Основной маркер ticketIdMarker (#НОМЕР:) уже есть.
+                // Убедимся, что он в правильном формате "Заявка #НОМЕР: Тема"
+                // и что нет дублирования с [Ticket#...]
+                if (isRe) {
+                    let subjectWithoutRe = baseSubject.substring(3).trim();
+                    if (!subjectWithoutRe.trim().startsWith(ticketIdPatternForRe.substring(0, ticketIdPatternForRe.indexOf(':') +1 ))) { // Проверяем начало без "Заявка "
+                         // Если маркер есть, но не в формате "Заявка #НОМЕР:", переформатируем
+                        subjectWithoutRe = subjectWithoutRe.replace(ticketIdMarker, '').trim(); // Убираем одинокий #НОМЕР:
+                        finalSubject = `Re: ${ticketIdPatternForRe} ${subjectWithoutRe}`.replace(/\s\s+/g, ' ').trim();
+                    } else {
+                        // Формат правильный, просто уберем [Ticket#...] если он есть
+                        finalSubject = baseSubject.replace(ticketIdMarkerSquare, '').replace(/\s\s+/g, ' ').trim();
+                    }
+                } else {
+                     if (!baseSubject.trim().startsWith(ticketIdPatternForRe.substring(0, ticketIdPatternForRe.indexOf(':') +1 ))) {
+                        baseSubject = baseSubject.replace(ticketIdMarker, '').trim();
+                        finalSubject = `${ticketIdPatternForRe} ${baseSubject}`.replace(/\s\s+/g, ' ').trim();
+                    } else {
+                        finalSubject = baseSubject.replace(ticketIdMarkerSquare, '').replace(/\s\s+/g, ' ').trim();
+                    }
                 }
             }
         }
-        // 2. Дополнительно можно добавить [Thread#...] для служебных целей, если нужно
+
+        // 2. Дополнительно добавляем [Thread#...] для служебных целей, если он есть и еще не добавлен
         if (options.threadId && !finalSubject.includes(`[Thread#${options.threadId}]`)) {
-            finalSubject = `${finalSubject} [Thread#${options.threadId}]`;
+            finalSubject = `${finalSubject.trim()} [Thread#${options.threadId}]`;
         }
 
+        // Убираем лишние пробелы, которые могли образоваться
+        finalSubject = finalSubject.replace(/\s\s+/g, ' ').trim();
+
+
         const mailOptions = {
-            from: `"${options.fromName || 'Ваш Сайт ИНТ'}" <${siteSenderEmail}>`, // Используйте siteSenderEmail
+            from: `"${options.fromName || 'Ваш Сайт ИНТ'}" <${siteSenderEmail}>`,
             to: to,
-            subject: finalSubject, // Используем обновленный finalSubject
+            subject: finalSubject,
             text: text,
             html: html,
             replyTo: options.replyTo || undefined,
@@ -83,12 +133,41 @@ async function sendEmail(to, subject, text, html, options = {}) {
         const info = await transporter.sendMail(mailOptions);
         console.log(`Email sent successfully to ${to} (Subject: "${finalSubject}"). Message ID: ${info.messageId}`);
 
-        // ... (логирование в БД) ...
+        if (options.saveToDb !== false && pool) {
+            let client;
+            try {
+                client = await pool.connect();
+                await client.query(
+                    `INSERT INTO emails (thread_id, subject, body, from_email, is_outgoing, created_at, user_id)
+                     VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6)`,
+                    [
+                        options.threadId || null,
+                        finalSubject,
+                        text,
+                        siteSenderEmail,
+                        true,
+                        options.userIdForLog || null
+                    ]
+                );
+                console.log(`Outgoing email (to: ${to}, subject: ${finalSubject}) logged to DB.`);
+            } catch (dbError) {
+                console.error('Error logging outgoing email to database:', dbError);
+            } finally {
+                if (client) client.release();
+            }
+        }
 
-        return { /* ... */ };
-    } catch (error) { /* ... */ }
+        return {
+            messageId: info.messageId,
+            threadId: options.threadId
+        };
+
+    } catch (error) {
+        const finalSubjectForError = (typeof finalSubject !== 'undefined') ? finalSubject : subject;
+        console.error(`Error sending email to ${to} with subject "${subject}" (attempted final subject: "${finalSubjectForError}"):`, error);
+        throw error;
+    }
 }
-
 
 app.use(helmet()); // Устанавливает безопасные HTTP заголовки
 
