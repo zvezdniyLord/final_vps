@@ -1559,49 +1559,109 @@ app.post('/api/tickets/:ticketNumber/reopen', verifyToken, async (req, res) => {
     } finally {
         if (client) client.release();
     }
-})
+});
+
+async function decodeMimeEncodedString(mimeString) {
+    if (!mimeString || typeof mimeString !== 'string' || !mimeString.startsWith('=?') || !mimeString.endsWith('?=')) {
+        return mimeString; // Возвращаем как есть, если не похоже на MIME
+    }
+    try {
+        const emailSource = `Subject: ${mimeString}\n\n`;
+        const parsedEmail = await simpleParser(emailSource);
+        return parsedEmail.subject || mimeString;
+    } catch (error) {
+        console.error("Error decoding MIME string with mailparser:", error);
+        return mimeString; // В случае ошибки возвращаем исходную строку, чтобы не прерывать поток
+    }
+}
+
+function extractTicketInfo(decodedSubject) {
+    // decodedSubject - это уже РАСКОДИРОВАННАЯ строка темы
+    if (!decodedSubject || typeof decodedSubject !== 'string') {
+        return { ticketNumber: null, message: "Decoded subject is invalid or empty." };
+    }
+
+    let ticketNumber = null;
+    let message = "Ticket number not found with known patterns in decoded subject.";
+
+    let match = decodedSubject.match(/#([0-9]+):/i);
+    if (match && match[1]) {
+        ticketNumber = match[1];
+        message = `Ticket number '${ticketNumber}' found using pattern '#...:'.`;
+        return { ticketNumber, message };
+    }
+
+
+    match = decodedSubject.match(/\[Ticket#([a-zA-Z0-9\-]+)\]/i);
+    if (match && match[1]) {
+        ticketNumber = match[1];
+        message = `Ticket number '${ticketNumber}' found using pattern '[Ticket#...]'.`;
+        return { ticketNumber, message };
+    }
+
+    match = decodedSubject.match(/Ticket#([a-zA-Z0-9\-]+)/i);
+    if (match && match[1]) {
+        ticketNumber = match[1];
+        message = `Ticket number '${ticketNumber}' found using pattern 'Ticket#...'.`;
+        return { ticketNumber, message };
+    }
+
+    match = decodedSubject.match(/_#([0-9]+):/i);
+    if (match && match[1]) {
+        ticketNumber = match[1];
+        message = `Ticket number '${ticketNumber}' found using pattern '_#...:'.`;
+        return { ticketNumber, message };
+    }
+
+    return { ticketNumber, message }; // ticketNumber будет null, если ни один паттерн не сработал
+}
+
+
 
 // 6. Эндпоинт для обработки входящих писем от почтового сервера
 app.post('/api/receive-email', async (req, res) => {
     // 1. Защита Webhook'а
-	//console.log(req.body);
-	//console.log(req.headers['x-API-key']);
-	//console.log(process.env.EMAIL_WEBHOOK_API_KEY);
-	//console.log(JSON.stringify(req.headers, null, 2));
-    //const apiKey = req.headers['x-api-key'];
-	const apiKey = req.headers['x-api-key'];
+    const apiKey = req.headers['x-api-key'];
     if (!process.env.EMAIL_WEBHOOK_API_KEY || apiKey !== process.env.EMAIL_WEBHOOK_API_KEY) {
         console.warn('Unauthorized webhook access attempt to /api/receive-email.');
         return res.status(401).json({ message: 'Unauthorized webhook access.' });
     }
 
     // 2. Получаем данные из тела запроса
+    // Возвращаем оригинальные имена переменных: subject и from
     const { subject, body, from } = req.body;
 
-    if (!subject || !body || !from) {
-        console.warn('Webhook /api/receive-email: Missing required fields.', req.body);
-        return res.status(400).json({ message: 'Missing required fields: subject, body, from_email are required.' });
+    // Проверяем наличие обязательных полей
+    if (!subject || !body || !from) { // Используем 'subject' и 'from'
+        console.warn('Webhook /api/receive-email: Missing required fields:', req.body);
+        // Сообщение об ошибке тоже должно соответствовать:
+        return res.status(400).json({ message: 'Missing required fields: subject, body, from are required.' });
     }
-    console.log(`req.subject: ${subject}`); 
-    let ticketNumber = null;
-    //const ticketNumberMatch = subject.match(/\[Ticket#([a-zA-Z0-9\-]+)\]/i); // Ищет [Ticket#<номер_заявки>]
-    // ([a-zA-Z0-9\-]+) - означает, что номер заявки может состоять из букв, цифр и дефисов.
-    // Если ваш ticket_number только из цифр, можно использовать (\d+)
-    const ticketNumberMatch = subject.match(/=\?UTF-8\?Q\?.*?_23([0-9]+)=3A.*?\?=/i);
-    console.log(`subject: ${ticketNumberMatch}`);
-    if (ticketNumberMatch && ticketNumberMatch[1]) {
-        ticketNumber = ticketNumberMatch[1];
-        console.log(`Webhook /api/receive-email: Extracted ticket_number '${ticketNumber}' from subject.`);
-    } else {
-        console.warn(`Webhook /api/receive-email: Could not extract ticket_number from subject: "${subject}". Email will be ignored.`);
-        // Если номер заявки не найден в теме, мы не можем связать письмо с заявкой.
-        // Возвращаем 200 OK, чтобы почтовый парсер не пытался отправить снова.
+
+    console.log(`Webhook /api/receive-email: Received raw subject: "${subject}"`); // Используем 'subject'
+
+    // 2.1. Декодируем тему письма (передаем 'subject' как исходную MIME-строку)
+    const decodedSubject = await decodeMimeEncodedString(subject);
+    console.log(`Webhook /api/receive-email: Decoded subject: "${decodedSubject}"`);
+
+    // 2.2. Извлекаем номер тикета из ДЕКОДИРОВАННОЙ темы
+    const ticketInfo = extractTicketInfo(decodedSubject);
+    const ticketNumber = ticketInfo.ticketNumber;
+
+    console.log(`Webhook /api/receive-email: Ticket extraction - ${ticketInfo.message}`);
+
+    if (!ticketNumber) {
+        console.warn(`Webhook /api/receive-email: Could not extract ticket_number. Raw subject: "${subject}", Decoded: "${decodedSubject}". Email will be ignored.`);
         return res.status(200).json({ message: 'Ticket number not found in subject. Email ignored.' });
     }
+    console.log(`Webhook /api/receive-email: Successfully extracted ticket_number '${ticketNumber}'.`);
+
+    // Используем ДЕКОДИРОВАННУЮ тему для записи в БД и дальнейшей логики
+    const subjectForDb = decodedSubject;
 
     let client;
     try {
-        client = await pool.connect();
+        client = await pool.connect(); // pool должен быть определен выше
         await client.query('BEGIN');
 
         // 4. Находим заявку в БД по извлеченному ticket_number
@@ -1617,34 +1677,34 @@ app.post('/api/receive-email', async (req, res) => {
 
         if (ticketQueryResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            console.warn(`Webhook /api/receive-email: Ticket not found for ticket_number: ${ticketNumber} (extracted from subject).`);
+            console.warn(`Webhook /api/receive-email: Ticket not found for ticket_number: ${ticketNumber}.`);
             return res.status(200).json({ message: `Ticket not found for ticket_number: ${ticketNumber}. Email ignored.` });
         }
         const ticket = ticketQueryResult.rows[0];
 
-        // ... (остальная логика остается такой же, как в предыдущем ответе, начиная с пункта 5)
-        // (Проверка статуса заявки, определение отправителя, сохранение в emails,
-        //  добавление в ticket_messages, обновление статуса заявки, отправка уведомлений)
-
         // 5. Определяем, кто отправитель: пользователь или техподдержка
-        let senderType = 'support';
+        let senderType = 'user';
         let senderIdForDb = ticket.user_id;
 
-        const supportEmails = (process.env.SUPPORT_EMAILS || supportEmail).split(',').map(email => email.trim().toLowerCase());
-        if (supportEmails.includes(from_email.toLowerCase())) {
+        const supportEmailEnv = process.env.SUPPORT_MAIN_EMAIL || 'default_support@example.com';
+        const supportEmailsEnv = (process.env.SUPPORT_EMAILS || supportEmailEnv).split(',').map(email => email.trim().toLowerCase());
+
+        // Используем 'from' для определения отправителя
+        if (supportEmailsEnv.includes(from.toLowerCase())) {
             senderType = 'support';
-            const supportStaffResult = await client.query('SELECT id FROM users WHERE email = $1 AND is_support = TRUE', [from_email]);
+            const supportStaffResult = await client.query('SELECT id FROM users WHERE email = $1 AND is_support = TRUE', [from]); // Используем 'from'
             senderIdForDb = supportStaffResult.rows.length > 0 ? supportStaffResult.rows[0].id : null;
-        } else if (from_email.toLowerCase() !== ticket.user_email.toLowerCase()) {
+        } else if (from.toLowerCase() !== ticket.user_email.toLowerCase()) { // Используем 'from'
             console.warn(`Webhook /api/receive-email: Email from '${from}' for ticket #${ticket.ticket_number}, but original user is '${ticket.user_email}'. Processing as user reply.`);
         }
 
-        // 6. Сохраняем входящее письмо в таблицу emails (опционально)
+        // 6. Сохраняем входящее письмо в таблицу emails
         const emailInsertResult = await client.query(
             `INSERT INTO emails (thread_id, subject, body, from_email, is_outgoing, created_at, user_id)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6)
              RETURNING id`,
-            [ticket.email_thread_id, subject, body, from, false, (senderType === 'user' ? ticket.user_id : senderIdForDb)]
+            // Для поля from_email в БД используем переменную 'from'
+            [ticket.email_thread_id, subjectForDb, body, from, false, (senderType === 'user' ? ticket.user_id : senderIdForDb)]
         );
         const emailId = emailInsertResult.rows[0].id;
 
@@ -1653,19 +1713,20 @@ app.post('/api/receive-email', async (req, res) => {
             `INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_email, message, email_id)
              VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING id, created_at, message_number`,
-            [ticket.id, senderType, senderIdForDb, from_email, body, emailId]
+            // Для поля sender_email в БД используем переменную 'from'
+            [ticket.id, senderType, senderIdForDb, from, body, emailId]
         );
         const newMessage = messageInsertResult.rows[0];
 
-        // 8. Обновляем статус заявки
+        // 8. Обновляем статус заявки (логика остается прежней)
         let newStatusName = ticket.status;
-        if (senderType === 'support' && (ticket.status === 'open' || ticket.status === 'in_progress')) {
+        if (senderType === 'support' && ['open', 'in_progress', 'reopened'].includes(ticket.status)) {
             newStatusName = 'waiting_for_user';
-        } else if (senderType === 'user' && ticket.status === 'waiting_for_user') {
-            newStatusName = 'open';
-        } else if (ticket.status === 'closed' && senderType === 'user') {
-            newStatusName = 'open';
-            console.log(`Ticket #${ticket.ticket_number} re-opened due to user reply via email.`);
+        } else if (senderType === 'user' && ['waiting_for_user', 'closed'].includes(ticket.status)) {
+            newStatusName = (ticket.status === 'closed') ? 'reopened' : 'open';
+            if (ticket.status === 'closed') {
+                console.log(`Webhook /api/receive-email: Ticket #${ticket.ticket_number} re-opened due to user reply.`);
+            }
         }
 
         if (newStatusName !== ticket.status) {
@@ -1675,6 +1736,10 @@ app.post('/api/receive-email', async (req, res) => {
                     `UPDATE tickets SET status_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
                     [newStatusResult.rows[0].id, ticket.id]
                 );
+                console.log(`Webhook /api/receive-email: Ticket #${ticket.ticket_number} status updated from '${ticket.status}' to '${newStatusName}'.`);
+            } else {
+                console.warn(`Webhook /api/receive-email: Status_id for '${newStatusName}' not found. Ticket status not changed.`);
+                await client.query(`UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [ticket.id]);
             }
         } else {
              await client.query(`UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [ticket.id]);
@@ -1683,29 +1748,34 @@ app.post('/api/receive-email', async (req, res) => {
         await client.query('COMMIT');
 
         // 9. Отправляем email-уведомление (если нужно)
-        if (senderType === 'support') { // Уведомляем пользователя
-            try {
-                await sendEmail(
-                    ticket.user_email,
-                    `Ответ по вашей заявке #${ticket.ticket_number}: ${ticket.ticket_subject}`,
-                    `Здравствуйте, ${ticket.user_name || 'Пользователь'}!\n\nСотрудник техподдержки (${from}) ответил на вашу заявку:\n\n${body}\n\nС уважением,\nТехподдержка ИНТ`,
-                    `<p>Здравствуйте, ${ticket.user_name || 'Пользователь'}!</p><p>Сотрудник техподдержки (${from}) ответил на вашу заявку #${ticket.ticket_number} (${ticket.ticket_subject}):</p><blockquote>${body.replace(/\n/g, '<br>')}</blockquote><p>С уважением,<br>Техподдержка ИНТ</p>`,
-                    { replyTo: supportEmail, threadId: ticket.email_thread_id, ticketNumber: ticket.ticket_number }
-                );
-            } catch (emailError) { console.error(`Webhook: Failed to send notification to user for ticket #${ticket.ticket_number}:`, emailError); }
-        } else if (senderType === 'user' && !supportEmails.includes(from_email.toLowerCase())) { // Уведомляем поддержку
-             try {
-                await sendEmail(
-                    supportEmail,
-                    `Новый ответ от пользователя по заявке #${ticket.ticket_number}: ${ticket.ticket_subject}`,
-                    `Пользователь ${ticket.user_name} (${from}) ответил на заявку #${ticket.ticket_number}:\n\n${body}`,
-                    `<p>Пользователь <strong>${ticket.user_name}</strong> (${from_email}) ответил на заявку #${ticket.ticket_number} (${ticket.ticket_subject}):</p><blockquote>${body.replace(/\n/g, '<br>')}</blockquote>`,
-                    { replyTo: from_email, threadId: ticket.email_thread_id, ticketNumber: ticket.ticket_number }
-                );
-            } catch (emailError) { console.error(`Webhook: Failed to send notification to support for ticket #${ticket.ticket_number}:`, emailError); }
+        if (typeof sendEmail === 'function') {
+            if (senderType === 'support') {
+                try {
+                    await sendEmail(
+                        ticket.user_email,
+                        `Ответ по вашей заявке #${ticket.ticket_number}: ${ticket.ticket_subject}`,
+                        `Здравствуйте, ${ticket.user_name || 'Пользователь'}!\n\nСотрудник техподдержки (${from}) ответил на вашу заявку:\n\n${body}\n\nС уважением,\nТехподдержка ИНТ`, // Используем 'from'
+                        `<p>Здравствуйте, ${ticket.user_name || 'Пользователь'}!</p><p>Сотрудник техподдержки (${from}) ответил на вашу заявку #${ticket.ticket_number} (${ticket.ticket_subject}):</p><blockquote>${body.replace(/\n/g, '<br>')}</blockquote><p>С уважением,<br>Техподдержка ИНТ</p>`,
+                        { replyTo: supportEmailEnv, threadId: ticket.email_thread_id, ticketNumber: ticket.ticket_number }
+                    );
+                } catch (emailError) { console.error(`Webhook: Failed to send notification to user for ticket #${ticket.ticket_number}:`, emailError); }
+            } else if (senderType === 'user' && !supportEmailsEnv.includes(from.toLowerCase())) { // Используем 'from'
+                 try {
+                    await sendEmail(
+                        supportEmailEnv,
+                        `Новый ответ от пользователя по заявке #${ticket.ticket_number}: ${ticket.ticket_subject}`,
+                        `Пользователь ${ticket.user_name} (${from}) ответил на заявку #${ticket.ticket_number}:\n\n${body}`, // Используем 'from'
+                        `<p>Пользователь <strong>${ticket.user_name}</strong> (${from}) ответил на заявку #${ticket.ticket_number} (${ticket.ticket_subject}):</p><blockquote>${body.replace(/\n/g, '<br>')}</blockquote>`,
+                        { replyTo: from, threadId: ticket.email_thread_id, ticketNumber: ticket.ticket_number } // Используем 'from'
+                    );
+                } catch (emailError) { console.error(`Webhook: Failed to send notification to support for ticket #${ticket.ticket_number}:`, emailError); }
+            }
+        } else {
+            console.warn("Webhook /api/receive-email: sendEmail function is not defined. Notifications skipped.");
         }
 
-        console.log(`Webhook /api/receive-email: Message from ${from} added to ticket #${ticket.ticket_number}`);
+
+        console.log(`Webhook /api/receive-email: Message from ${from} successfully processed for ticket #${ticket.ticket_number}`); // Используем 'from'
         res.status(200).json({
             message: 'Email successfully processed and added to ticket.',
             ticket_number: ticket.ticket_number,
