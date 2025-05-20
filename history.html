@@ -1117,7 +1117,7 @@
                         <div class="form-group">
                             <label for="attachmentInput">Прикрепить файлы (до 5, макс. 10MB каждый)</label>
                             <input type="file" id="attachmentInput" name="attachments" multiple>
-                            <small>Разрешенные типы: JPG, PNG, PDF, DOC(X), XLS(X), TXT, ZIP.</small>
+                            <small>Разрешенные типы: PDF, DOC(X), XLS(X)</small>
                             <!-- Контейнер для отображения списка выбранных файлов -->
                             <div id="selectedFilesContainer" class="selected-files-container" style="margin-top: 10px;">
                                 <!-- Сюда будут добавляться выбранные файлы -->
@@ -1557,7 +1557,7 @@ class TicketManager {
             let senderDisplayName = 'Неизвестно';
             let messageClass = '';
             if (message.sender_type === 'user') {
-                senderDisplayName = (message.sender_id === currentUserId) ? 'Вы' : (message.sender_name || message.sender_email);
+                senderDisplayName = (message.sender_id === currentUserId) ? '' : (message.sender_name || message.sender_email);
                 messageClass = (message.sender_id === currentUserId) ? 'user-message' : 'user-message-other';
             } else if (message.sender_type === 'support') {
                 senderDisplayName = 'Техподдержка ИНТ';

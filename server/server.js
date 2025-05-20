@@ -35,7 +35,8 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-const supportEmail = 'mailuser@mail.devsanya.ru'
+const supportEmail = 'mailuser@mail.devsanya.ru';
+//const supportEmail = 'devsanya.ru';
 const siteSenderEmail = 'devsanya.ru';
 
 async function sendEmail(to, subject, text, html, options = {}) {
@@ -49,8 +50,8 @@ async function sendEmail(to, subject, text, html, options = {}) {
         // 1. Обработка идентификатора тикета
         if (options.ticketNumber) {
             const ticketIdNumber = options.ticketNumber;
-            const mainTicketMarker = `#${ticketIdNumber}:`; // Наш целевой маркер e.g., #12345:
-            const fullTicketPattern = `Заявка ${mainTicketMarker}`; // Как он должен выглядеть в теме e.g., Заявка #12345:
+            const mainTicketMarker = `#${ticketIdNumber}:`;
+            const fullTicketPattern = `Заявка ${mainTicketMarker}`;
 
             console.log(`sendEmail DBG: Processing ticketNumber: ${ticketIdNumber}. Target pattern: "${fullTicketPattern}"`);
 
@@ -419,11 +420,6 @@ app.put('/api/user/profile', verifyToken, async (req, res) => {
     }
 });
 
-// Добавьте в .env файл
-// ADMIN_PASSWORD=ваш_сложный_пароль_администратора
-// ADMIN_JWT_SECRET=другой_секретный_ключ_для_админских_токенов
-
-// Эндпоинт для входа администратора
 app.post('/api/admin/login', async (req, res) => {
     const { password } = req.body;
 
@@ -606,7 +602,9 @@ const fileFilter = (req, file, cb) => {
             file.mimetype === 'application/msword' ||
             file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
             file.mimetype === 'application/vnd.ms-excel' ||
-            file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+            file.mimetype === 'image/png' ||
+            file.mimetype === 'image/jpeg'
         ) {
             cb(null, true);
         } else {
@@ -964,7 +962,7 @@ app.post('/api/tickets', verifyToken, upload.array('attachments', 5), async (req
 
         // Получаем полное имя пользователя из БД
         const userDetailsResult = await client.query('SELECT fio FROM users WHERE id = $1', [userId]);
-        const senderName = userDetailsResult.rows.length > 0 ? userDetailsResult.rows[0].full_name : userEmailFromToken;
+        const senderName = userDetailsResult.rows.length > 0 ? userDetailsResult.rows[0].fio : userEmailFromToken;
 
         // 1. Создаем запись о заявке в таблице 'tickets'
         const ticketInsertResult = await client.query(
@@ -1669,8 +1667,6 @@ app.post('/api/receive-email', async (req, res) => {
         return res.status(401).json({ message: 'Unauthorized webhook access.' });
     }
 
-    // 2. Получаем данные из тела запроса
-    // Возвращаем оригинальные имена переменных: subject и from
     const { subject, body, from } = req.body;
 
     // Проверяем наличие обязательных полей
@@ -1941,8 +1937,7 @@ app.get('/', (req, res) => {
     res.send('API is running!');
 });
 
-// --- Error Handling Middleware (Ловит ошибки, не пойманные в роутах) ---
-// Должен быть ПОСЛЕДНИМ app.use
+
 app.use((err, req, res, next) => {
     console.error('!!! UNHANDLED ERROR:', err.stack);
     res.status(500).json({ message: 'Непредвиденная ошибка сервера' });

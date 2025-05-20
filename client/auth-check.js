@@ -1,9 +1,8 @@
 // auth-check.js
 (function() {
-    const unauthenticatedLinksContainer = document.querySelector('.header__auth-links'); // Ваш основной контейнер для "Вход | Регистрация"
-    let authenticatedLinksContainer; // Будет создан динамически или найден, если уже есть
+    const unauthenticatedLinksContainer = document.querySelector('.header__auth-links');
+    let authenticatedLinksContainer;
 
-    // Функция для обновления состояния хедера
     function updateHeaderDisplay(isLoggedIn, userData = null) {
         if (!unauthenticatedLinksContainer) {
             console.warn('Header auth links container (.header__auth-links) not found.');
@@ -11,25 +10,22 @@
         }
 
         if (isLoggedIn) {
-            // Пользователь авторизован
             unauthenticatedLinksContainer.style.display = 'none';
-
-            // Проверяем, есть ли уже контейнер для авторизованного пользователя
             authenticatedLinksContainer = document.getElementById('auth-links-authenticated-dynamic');
             if (!authenticatedLinksContainer) {
-                // Создаем контейнер для авторизованного пользователя, если его нет
                 authenticatedLinksContainer = document.createElement('div');
                 authenticatedLinksContainer.id = 'auth-links-authenticated-dynamic';
-                authenticatedLinksContainer.className = 'header__auth-links'; // Используем тот же класс для стилей
+                authenticatedLinksContainer.className = 'header__auth-links';
 
-                const greetingSpan = document.createElement('span');
-                greetingSpan.id = 'user-greeting-header-dynamic';
-                greetingSpan.className = 'header__user-greeting'; // Добавьте стили
+                // Убрал динамическое создание приветствия, так как оно не использовалось
+                // const greetingSpan = document.createElement('span');
+                // greetingSpan.id = 'user-greeting-header-dynamic';
+                // greetingSpan.className = 'header__user-greeting';
 
                 const profileLink = document.createElement('a');
                 profileLink.className = 'header__auth-link';
-                profileLink.href = '../lk.html'; // Убедитесь, что путь корректен
-                profileLink.textContent = 'Личный кабинет';
+                profileLink.href = '../lk.html'; // Путь к личному кабинету
+                profileLink.textContent = 'Личный кабинет'; // Можно заменить на userData.fio или email ниже
 
                 const separatorSpan = document.createElement('span');
                 separatorSpan.className = 'header__span';
@@ -37,92 +33,93 @@
 
                 const logoutButton = document.createElement('button');
                 logoutButton.id = 'logoutButtonHeaderDynamic';
-                logoutButton.className = 'header__auth-link header__logout-btn'; // Классы для стилизации
+                logoutButton.className = 'header__auth-link header__logout-btn';
                 logoutButton.textContent = 'Выйти';
                 logoutButton.addEventListener('click', handleLogout);
 
-                //authenticatedLinksContainer.appendChild(greetingSpan);
-                authenticatedLinksContainer.appendChild(profileLink);
-                authenticatedLinksContainer.appendChild(separatorSpan);
-                authenticatedLinksContainer.appendChild(logoutButton);
-
-                // Вставляем новый контейнер после существующего (или в нужное место)
-                unauthenticatedLinksContainer.parentNode.insertBefore(authenticatedLinksContainer, unauthenticatedLinksContainer.nextSibling);
-            }
-
-            // Обновляем приветствие
-            const greetingElement = document.getElementById('user-greeting-header-dynamic');
-            if (greetingElement) {
+                // Обновляем текст ссылки на профиль, если есть userData
                 if (userData && (userData.fio || userData.email)) {
-                    greetingElement.textContent = `Привет, ${userData.fio || userData.email}!`;
+                    profileLink.textContent = userData.fio || userData.email;
                 } else {
-                    // Попробуем взять из localStorage, если userData не передали явно
                     const storedUserDataString = localStorage.getItem('userData');
                     if (storedUserDataString) {
                         try {
                             const storedUserData = JSON.parse(storedUserDataString);
-                            greetingElement.textContent = `Привет, ${storedUserData.fio || storedUserData.email}!`;
-                        } catch (e) { greetingElement.textContent = 'Профиль'; }
+                            profileLink.textContent = storedUserData.fio || storedUserData.email || 'Личный кабинет';
+                        } catch (e) { /* profileLink.textContent остается 'Личный кабинет' */ }
+                    }
+                }
+
+
+                // authenticatedLinksContainer.appendChild(greetingSpan); // Убрано
+                authenticatedLinksContainer.appendChild(profileLink);
+                authenticatedLinksContainer.appendChild(separatorSpan);
+                authenticatedLinksContainer.appendChild(logoutButton);
+
+                unauthenticatedLinksContainer.parentNode.insertBefore(authenticatedLinksContainer, unauthenticatedLinksContainer.nextSibling);
+            } else {
+                 // Если контейнер уже есть, просто обновим текст ссылки на профиль
+                const profileLink = authenticatedLinksContainer.querySelector('a[href="../lk.html"]');
+                if (profileLink) {
+                    if (userData && (userData.fio || userData.email)) {
+                        profileLink.textContent = userData.fio || userData.email;
                     } else {
-                        greetingElement.textContent = 'Профиль';
+                        const storedUserDataString = localStorage.getItem('userData');
+                        if (storedUserDataString) {
+                            try {
+                                const storedUserData = JSON.parse(storedUserDataString);
+                                profileLink.textContent = storedUserData.fio || storedUserData.email || 'Личный кабинет';
+                            } catch (e) { /* profileLink.textContent остается 'Личный кабинет' */ }
+                        } else {
+                             profileLink.textContent = 'Личный кабинет'; // Дефолт, если ничего нет
+                        }
                     }
                 }
             }
-            authenticatedLinksContainer.style.display = 'flex'; // Показываем
+            authenticatedLinksContainer.style.display = 'flex';
         } else {
-            // Пользователь не авторизован
-            unauthenticatedLinksContainer.style.display = 'flex'; // Показываем (или как было в стилях)
+            unauthenticatedLinksContainer.style.display = 'flex';
             if (authenticatedLinksContainer) {
-                authenticatedLinksContainer.style.display = 'none'; // Скрываем, если был создан
+                authenticatedLinksContainer.style.display = 'none';
             }
         }
     }
 
     async function handleLogout() {
-        const token = localStorage.getItem('token'); // Используйте 'token', как в вашем скрипте
-
+        const token = localStorage.getItem('token');
         localStorage.removeItem('token');
-        localStorage.removeItem('userData'); // Если сохраняли данные пользователя
-        localStorage.removeItem('redirectAfterLogin'); // Очищаем и это на всякий случай
-
-        // Устанавливаем флаг, что только что вышли
+        localStorage.removeItem('userData');
+        localStorage.removeItem('redirectAfterLogin');
         sessionStorage.setItem('justLoggedOut', 'true');
 
-        // Опциональный запрос на сервер для выхода
-        if (token) { // Отправляем запрос на выход, только если токен был
+        if (token) {
             try {
                 await fetch('/api/logout', { // Убедитесь, что URL /api/logout правильный
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${token}` // Если ваш /api/logout требует токен
+                        'Authorization': `Bearer ${token}`
                     }
                 });
             } catch (error) {
                 console.error('Ошибка при выходе на сервере:', error);
             }
         }
-
-        // Обновляем хедер и перенаправляем
         updateHeaderDisplay(false);
-        window.location.href = './auth.html'; // Перенаправляем на страницу входа
+        // Перенаправляем на страницу входа. Убедитесь, что путь корректен
+        // из любой точки сайта. Абсолютный путь может быть надежнее.
+        window.location.href = '/auth.html'; // или './auth.html' если он всегда в той же директории
     }
 
-    // --- Основная логика скрипта ---
     const justLoggedOut = sessionStorage.getItem('justLoggedOut');
-
     if (justLoggedOut === 'true') {
         sessionStorage.removeItem('justLoggedOut');
-        updateHeaderDisplay(false); // Убедимся, что хедер для неавторизованного пользователя
-        // Находимся на auth.html или куда был редирект, больше ничего не делаем
+        updateHeaderDisplay(false);
         return;
     }
 
-    const token = localStorage.getItem('token'); // Имя ключа токена
-
+    const token = localStorage.getItem('token');
+    let userData = null;
     if (token) {
-        // Токен есть, пользователь считается авторизованным (для отображения UI)
-        // Попробуем получить userData из localStorage
-        let userData = null;
         const userDataString = localStorage.getItem('userData');
         if (userDataString) {
             try {
@@ -130,28 +127,37 @@
             } catch (e) { console.error("Error parsing userData from localStorage", e); }
         }
         updateHeaderDisplay(true, userData);
-        // Скрипт завершается, страница загружается для авторизованного пользователя
     } else {
-        // Токена нет, пользователь не авторизован
-        updateHeaderDisplay(false); // Показываем хедер для неавторизованного
+        updateHeaderDisplay(false);
 
-        const currentPage = window.location.pathname + window.location.search;
-        // Исключаем страницы входа и регистрации из сохранения для редиректа
-        if (!currentPage.includes('auth.html') && !currentPage.includes('reg.html')) {
-            localStorage.setItem('redirectAfterLogin', currentPage);
+        const currentPathname = window.location.pathname;
+        // Нормализуем путь: удаляем слэши в начале/конце и приводим к нижнему регистру
+        const normalizedPath = currentPathname.replace(/^\/|\/$/g, '').toLowerCase();
+
+        // Получаем имя файла
+        let currentPageFile = normalizedPath.substring(normalizedPath.lastIndexOf('/') + 1);
+        if (currentPageFile === '') {
+            currentPageFile = 'index.html';
         }
 
-        // Перенаправляем на страницу входа, если мы НЕ на странице входа или регистрации
-        // И если это не главная страница, куда иногда не нужно принудительно редиректить
-        const currentPathFile = window.location.pathname.substring(window.location.pathname.lastIndexOf('/') + 1);
-        if (currentPathFile !== 'auth.html' && currentPathFile !== 'reg.html') {
-            // Раскомментируйте и используйте, если basePath нужен, но для простоты пока прямой путь
-            // const pathSegments = window.location.pathname.split('/');
-            // const depth = pathSegments.length - 2;
-            // const basePath = depth > 0 ? '../'.repeat(depth) : './';
-            // window.location.href = `${basePath}auth.html`;
-            window.location.href = './auth.html'; // Убедитесь, что этот путь всегда корректен
-                                                // или используйте абсолютный /auth.html
+        // Публичные страницы (в нижнем регистре)
+        const publicPages = [
+            'index.html', 'about.html', 'alarms.html', 'clientsecurity.html', 'contacts.html',
+            'datatransport.html', 'demo.html', 'documentation.html', 'education.html',
+            'historyserver.html', 'hmi.html', 'ienvcontrol.html', 'integrator.html',
+            'iserver.html', 'licence.html', 'moscow.html', 'price.html', 'products.html',
+            'reports.html', 'supports.html', 'systemreq.html', 'trends.html', 'video.html',
+            'webhmi.html', 'auth.html', 'reg.html'  // Добавляем auth и reg для единообразия
+        ];
+
+        // Сохраняем текущую страницу для редиректа после логина
+        if (!publicPages.includes(currentPageFile)) {
+            localStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search);
+        }
+
+        // Перенаправляем только если страница не публичная
+        if (!publicPages.includes(currentPageFile)) {
+            window.location.href = './auth.html';
         }
     }
 })();

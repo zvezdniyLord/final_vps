@@ -36,13 +36,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (accountForm) {
                     // Находим все поля формы
                     const fioInput = accountForm.querySelector('input[name="fio"]');
-                    const phoneInput = accountForm.querySelector('input[name="password"]'); // Судя по placeholder, это телефон
+                    const phoneInput = accountForm.querySelector('input[name="phone"]'); // Судя по placeholder, это телефон
                     const passwordInput = accountForm.querySelector('input[name="company"]'); // Судя по placeholder, это пароль
                     const companyInput = accountForm.querySelector('input[name="activity_sphere"]'); // Судя по placeholder, это компания
                     const positionInput = accountForm.querySelector('input[name="position"]');
                     const emailInput = accountForm.querySelector('input[placeholder="email"]');
                     const cityInput = accountForm.querySelector('input[name="city"]');
-
+                    console.log(companyInput)
                     // Заполняем поля данными
                     if (fioInput) fioInput.value = user.fio || '';
                     if (phoneInput) phoneInput.value = user.phone || '';
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         emailInput.value = user.email || '';
                         emailInput.disabled = true; // Делаем email неизменяемым
                     }
-                    if (cityInput) cityInput.value = user.city || '';
+                    if (cityInput) cityInput.value = user.activity_sphere	 || '';
                 }
 
                 // Отображаем данные профиля (если есть div для этого)

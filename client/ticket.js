@@ -118,7 +118,6 @@ class TicketDetails {
     // Отображение сообщений заявки
     renderMessages(messages) {
         if (!this.messagesContainer) return;
-
         this.messagesContainer.innerHTML = '';
 
         messages.forEach(message => {
@@ -142,7 +141,6 @@ class TicketDetails {
                     </div>
                 `;
             }
-
             messageElement.innerHTML = `
                 <div class="message-header">
                     <span class="message-sender">${message.sender_type === 'user' ? 'Вы' : 'Техподдержка'}</span>

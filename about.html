@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script defer src="./client/auth-check.js"></script>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -27,7 +28,7 @@
             <div class="header__container-items">
                 <p class="header__p">
                     <a class="header__link" href="./about.html">о нас</a>
-                </p>    
+                </p>
                 <div class="header__p header__p-hover-product">
                     <button class="btn__header-p">
                         <a class="header__link" href="./products.html">продукты</a>
@@ -144,6 +145,12 @@
             <span class="header__span">|</span>
             <a class="header__auth-link" href="./reg.html">Регистрация</a>
         </div>
+        <div id="auth-links-authenticated" class="header__auth-links" style="display: none;">
+            <span id="user-greeting-header" class="header__user-greeting"></span>
+            <a class="header__auth-link" href="./profile.html">Личный кабинет</a>
+            <span class="header__span">|</span>
+            <button id="logoutButtonHeader" class="header__auth-link header__logout-btn">Выйти</button>
+        </div>
     </header>
     <div class="mob__menu">
         <input class="side-menu" type="checkbox" id="side-menu"/>
@@ -158,7 +165,7 @@
                 <a class="header__auth-link" href="./reg.html">Регистрация</a>
             </div>
         </label>
-        
+
         <nav class="nav">
             <ul class="menu">
                 <div class="menu__block menu__block-product">
@@ -274,7 +281,7 @@
                     </p>
                     <p class="mt-20">ООО ИНТ, является частью компании ЭлеСи – более 30 лет изобретает, разрабатывает и производит продукцию и системные решения для автоматизации в соответствии с потребностями клиентов. Персонал компании насчитывает более 600 сотрудников.</p>
                     <p class="mt-20">Мы неукоснительно следуем миссии компании:
-                        “Используя корпоративный интеллект, знания и новейшие технологии, мы создаем и непрерывно совершенствуем мир технических систем, несем радость творчества и социальный оптимизм их создателям, эффективность и комфорт потребителям, содействуем техническому прогрессу, накоплению общественного блага, вносим вклад в развитие России и ее интеграцию в мировое сообщество.”</p>   
+                        “Используя корпоративный интеллект, знания и новейшие технологии, мы создаем и непрерывно совершенствуем мир технических систем, несем радость творчества и социальный оптимизм их создателям, эффективность и комфорт потребителям, содействуем техническому прогрессу, накоплению общественного блага, вносим вклад в развитие России и ее интеграцию в мировое сообщество.”</p>
                 </div>
             </div>
         </section>
@@ -296,13 +303,13 @@
                             <img width="108" height="38" src="./media/timeline-right.png" alt="">
                             <div class="fl-block-text">
                                 <p  class="timeline__text">Год основания компании</p>
-                            </div>  
+                            </div>
                         </div>
                         <div class="fl-block 2">
                             <div class="fl-block-text">
                                 <p  class="timeline__text">Проект автоматизации Братской ГЭС </p>
-                                <span class="timeline-span">1200 сигналов, свой контроллер</span>  
-                            </div>  
+                                <span class="timeline-span">1200 сигналов, свой контроллер</span>
+                            </div>
                             <svg width="108" height="38" viewBox="0 0 114 44" fill="#892629" xmlns="http://www.w3.org/2000/svg">
                                 <g filter="url(#filter0_d_6660_10325)">
                                 <circle cx="103" cy="18" r="3" transform="rotate(-180 103 18)" fill="#892629"/>
@@ -324,7 +331,7 @@
                                 <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_6660_10325" result="shape"/>
                                 </filter>
                                 </defs>
-                                </svg>                                
+                                </svg>
                             <p class="timeline__year fl-2">1995</p>
                             <div class="fl-block-empty"></div>
                         </div>
@@ -353,24 +360,24 @@
                                 </filter>
                                 </defs>
                                 </svg>
-                                
+
                             <div class="fl-block-text">
                                 <p  class="timeline__text" style="text-align: left;">СДКУ Транснефть</p>
                                 <span class="timeline-span">387 - клиентов     25 - районных ДП
-                                    11 - территориальных ДП    
+                                    11 - территориальных ДП
                                     2x106 - сигналов в системе
                                 </span>
-                            </div>  
+                            </div>
                         </div>
                         <div class="fl-block 4">
                             <div class="fl-block-text">
                                 <p style="text-align: left;" class="timeline__text">
                                     Разработан собственный
                                     программный продукт
-                                    сервер ввода/вывода Восток <br> 
+                                    сервер ввода/вывода Восток <br>
                                     Взят курс на разработку
                                     собственной СКАДА системы</p>
-                            </div>  
+                            </div>
                             <svg width="108" height="38" fill="#004178" viewBox="0 0 114 44" xmlns="http://www.w3.org/2000/svg">
                                 <g filter="url(#filter0_d_6660_10325)">
                                 <circle cx="103" cy="18" r="3" transform="rotate(-180 103 18)" fill="#632E3F"/>
@@ -420,13 +427,13 @@
                                 <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_6660_10315" result="shape"/>
                                 </filter>
                                 </defs>
-                                </svg>                                
+                                </svg>
                             <div class="fl-block-text">
                                 <p style="text-align: left;" class="timeline__text">Проект Север</p>
                                 <span class="timeline-span">108 - клиентов 7 - перекачивающих станций
                                     0,4х10^6
                                 </span>
-                            </div>  
+                            </div>
                         </div>
                         <div class="fl-block 6">
                             <div class="fl-block-text">
@@ -434,9 +441,9 @@
                                     системы InfinitySuite
                                     <br>
                                    Взят курс на расширение
-                                   функциональных возможностей 
+                                   функциональных возможностей
                                 </p>
-                            </div>  
+                            </div>
                             <svg width="108" height="38" fill="#004178" viewBox="0 0 114 44" xmlns="http://www.w3.org/2000/svg">
                                 <g filter="url(#filter0_d_6660_10325)">
                                 <circle cx="103" cy="18" r="3" transform="rotate(-180 103 18)" fill="#4A334E"/>
@@ -486,14 +493,14 @@
                                 <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_6660_10315" result="shape"/>
                                 </filter>
                                 </defs>
-                                </svg>                                
+                                </svg>
                             <div class="fl-block-text">
                                 <p style="text-align: left;" class="timeline__text">ЕСУ ТС ВСТО</p>
                                 <span class="timeline-span">340 - контейнеров ТМ и связи <br>
                                     21 - перекачивающая станция
                                     1х10^6 - сигналов в системе
                                 </span>
-                            </div>  
+                            </div>
                         </div>
                         <div class="fl-block 8">
                             <div class="fl-block-text">
@@ -501,9 +508,9 @@
                                     продукте SCADA Infinity
                                     <br>
                                    Взят курс на разработку
-                                   кросплатформенного решения 
+                                   кросплатформенного решения
                                 </p>
-                            </div>  
+                            </div>
                             <svg width="108" height="38" fill="#004178" viewBox="0 0 114 44" xmlns="http://www.w3.org/2000/svg">
                                 <g filter="url(#filter0_d_6660_10325)">
                                 <circle cx="103" cy="18" r="3" transform="rotate(-180 103 18)" fill="#3C3556"/>
@@ -553,7 +560,7 @@
                                 <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_6660_10315" result="shape"/>
                                 </filter>
                                 </defs>
-                            </svg>                                
+                            </svg>
                             <div class="fl-block-text">
                                 <p style="text-align: left;" class="timeline__text">АСДУ Московского Метрополитена</p>
                                 <span class="timeline-span">
@@ -563,14 +570,14 @@
                                 <span class="timeline-span">
                                     8 - шахт 0,2х10^6 - сигналов в системе
                                 </span>
-                            </div>  
+                            </div>
                         </div>
                         <div class="fl-block 10">
                             <div class="fl-block-text">
                                 <p style="text-align: left;" class="timeline__text">Представлена кроссплатформенная
                                     СКАДА система Integrity SCADA
                                 </p>
-                            </div>  
+                            </div>
                             <svg width="108" height="38" fill="#163D6B" viewBox="0 0 114 44" xmlns="http://www.w3.org/2000/svg">
                                 <g filter="url(#filter0_d_6660_10325)">
                                 <circle cx="103" cy="18" r="3" transform="rotate(-180 103 18)" fill="#163D6B"/>
@@ -620,7 +627,7 @@
                                 <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_6660_10315" result="shape"/>
                                 </filter>
                                 </defs>
-                            </svg>                                
+                            </svg>
                             <div class="fl-block-text">
                                 <p style="text-align: left;" class="timeline__text">СОДУ Сила Сибири</p>
                                 <span class="timeline-span">
@@ -629,7 +636,7 @@
                                     150 - контрольных пунктов
                                     0,7х10^6 - сигналов в системе
                                 </span>
-                            </div>  
+                            </div>
                         </div>
                         <div class="fl-block 12">
                             <div class="fl-block-text">
@@ -637,7 +644,7 @@
                                     проектов автоматизациии с
                                      использованием Integrity SCADA
                                 </p>
-                            </div>  
+                            </div>
                             <svg width="108" height="38" fill="#004178" viewBox="0 0 114 44" xmlns="http://www.w3.org/2000/svg">
                                 <g filter="url(#filter0_d_6660_10325)">
                                 <circle cx="103" cy="18" r="3" transform="rotate(-180 103 18)" fill="#004578"/>

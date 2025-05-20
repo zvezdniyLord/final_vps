@@ -9,6 +9,96 @@
     margin-top: 9rem;
 }
 
+.astra__pictures {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.astra_certs > picture {
+    margin-left: 1rem;
+}
+
+.security {
+    min-height: 820px;
+}
+
+.security__title {
+    font-size: 64px;
+    line-height: 64px;
+    font-weight: 700;
+    margin-top: 5rem;
+    margin-bottom: 10px;
+    color: var(--color-title-blue);
+}
+
+.security__subtitle {
+    font-size: 24px;
+    line-height: 30px;
+    font-weight: 700;
+    margin-bottom: 50px;
+    color: var(--color-text-grey);
+    position: relative;
+    z-index: 33;
+}
+
+.security__blocks {
+    display: flex;
+    position: relative;
+}
+
+.security__blocks::before {
+    content: "";
+    position: absolute;
+    background-image: url('../../media/fstec.png');
+    width: 350px;
+    height: 465px;
+    background-repeat: no-repeat;
+    top: 120px;
+    left: -115px;
+}
+
+.security__footer {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    justify-content: end;
+    margin-top: 80px;
+    height: 100px;
+}
+
+.security__footer-block {
+    height: 180px;
+    max-width: 100%;
+    background-color: var(--color-title-blue);
+    display: flex;
+    align-items: center;
+}
+
+.security__footer-text {
+    text-transform: uppercase;
+    font-size: 40px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 40px;
+    text-align: right;
+    max-width: 595px;
+}
+
+.security__footer-imgs {
+    width: 536px;
+    max-width: 536px;
+    height: 124px;
+    background-color: #fff;
+    border-radius: 12px;
+    margin-left: 50px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    align-items: center;
+    margin-right: 50px;
+}
+
 .preview__title {
     font-size: 2rem;
     line-height: 2rem;
@@ -16,7 +106,7 @@
     color: var(--color-title-blue);
     font-weight: 800;
     margin-top: 2.5rem;
-    
+
 }
 
 .preview__subtitle {
@@ -439,20 +529,20 @@
     min-width: 500px;
     width: 60%;
     margin: 0 0 0 0;
-    
+
   }
-  
+
   .slider_main {
     display: flex;
     width: 780px;
     height: 100%;
-    overflow: hidden; 
+    overflow: hidden;
   }
-  
+
   .slider_screen {
     width: 5%;
   }
-  
+
   .slider_ribbon {
     position: relative;
     display: flex;
@@ -467,7 +557,7 @@
     max-width: 175px;
     border: 1px solid #fff;
 }
-  
+
   .slider_ribbon_item {
     display: flex;
     justify-content: center;
@@ -478,13 +568,13 @@
     border-radius: .1em;
     z-index: 0;
   }
-  
+
   .nav_btn {
     position: relative;
     top: 40%;
     left: 17%;
   }
-  
+
 .slider__hr {
     width: 1300px;
     margin-top: 5rem;
@@ -925,7 +1015,7 @@
 }
 
 .btn__captcha {
-   
+
 }
 
 .captcha__char {
