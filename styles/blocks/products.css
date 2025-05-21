@@ -2,6 +2,7 @@
     display: flex;
     justify-content: space-between;
     padding-top: 100px;
+    height: 100vh;
 }
 
 .main__product {
@@ -311,7 +312,7 @@ li {
 
 @keyframes closeProduct {
     from {opacity: 1;}
-    to {opacity: 0;} 
+    to {opacity: 0;}
 }
 
 .list__products-item {
