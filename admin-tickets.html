@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тех. поддержка - Список заявок</title>
+    <style>
+
+:root {
+    --main-bg-color: #f4f7f6; /* Немного другой оттенок серого, более мягкий */
+    --sidebar-bg-color: #ffffff;
+    --sidebar-active-bg-color: #3D5A78; /* Чуть приглушенный синий, ближе к скриншоту */
+    --sidebar-active-text-color: #ffffff;
+    --sidebar-text-color: #4a5568; /* Темно-серый для текста в сайдбаре */
+    --sidebar-hover-bg-color: #e2e8f0;
+    --sidebar-border-color: #e2e8f0; /* Цвет границы для кнопок сайдбара */
+
+    --content-bg-color: #ffffff;
+    --card-bg-color: #ffffff;
+    --card-border-color: #e7eaec;
+    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); /* Более выраженная, но мягкая тень */
+    --card-hover-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+
+    --primary-text-color: #2d3748; /* Более темный основной текст */
+    --secondary-text-color: #718096; /* Приглушенный серый для вторичного текста */
+
+    --accent-color-open: #3182ce; /* Ярко-синий для "открыта" */
+    --accent-color-open-bg: #ebf8ff;
+    --accent-color-closed: #c53030; /* Красный для "закрыта" */
+    --accent-color-closed-bg: #fff5f5;
+    --accent-color-waiting: #dd6b20; /* Оранжевый для "ожидает" */
+    --accent-color-waiting-bg: #fffaf0;
+    /* Добавьте другие акцентные цвета для статусов */
+
+    --header-text-color: #2c5282; /* Темно-синий для заголовка H1 */
+    --button-primary-bg: var(--sidebar-active-bg-color);
+    --button-primary-text: #ffffff;
+    --button-hover-bg: #2c4a66; /* Затемненный вариант для ховера */
+
+    --table-header-bg: #f7fafc;
+    --table-border-color: #e2e8f0;
+
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --border-radius-sm: 4px;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+
+    --transition-speed: 0.3s;
+    --transition-timing: ease-in-out;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box; /* Улучшает управление размерами */
+}
+
+body {
+    font-family: var(--font-family);
+    margin: 0;
+    background-color: var(--main-bg-color);
+    color: var(--primary-text-color);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased; /* Улучшение рендеринга шрифтов */
+    -moz-osx-font-smoothing: grayscale;
+}
+
+td > button {
+    background-color: var(--button-hover-bg);
+    transform: translateY(-1px);
+    padding: 10px 15px;
+    border: 1px solid var(--sidebar-border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 14px;
+    background-color: #fff;
+    cursor: pointer;
+    transition: border-color var(--transition-speed) var(--transition-timing), box-shadow var(--transition-speed) var(--transition-timing);
+}
+
+.admin-layout {
+    display: flex;
+    width: 100%;
+}
+
+.sidebar {
+    width: 260px;
+    background-color: var(--sidebar-bg-color);
+    padding: 25px 20px;
+    box-shadow: 3px 0 10px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+    transition: width var(--transition-speed) var(--transition-timing); /* Анимация ширины (если планируется сворачивание) */
+}
+
+.sidebar-button {
+    display: flex; /* Для выравнивания иконки и текста, если будут иконки */
+    align-items: center;
+    width: 100%;
+    padding: 13px 18px;
+    margin-bottom: 10px;
+    background-color: transparent; /* Прозрачный фон по умолчанию */
+    color: var(--sidebar-text-color);
+    border: none; /* Убираем рамку, если не нужна, или оставляем --sidebar-border-color */
+    border-radius: var(--border-radius-md);
+    text-align: left;
+    font-size: 15px;
+    font-weight: 500; /* Немного жирнее текст */
+    cursor: pointer;
+    transition: background-color var(--transition-speed) var(--transition-timing),
+                color var(--transition-speed) var(--transition-timing),
+                transform var(--transition-speed) var(--transition-timing);
+}
+
+.sidebar-button:hover {
+    background-color: var(--sidebar-hover-bg-color);
+    color: var(--primary-text-color); /* Можно сделать текст темнее при ховере */
+    transform: translateX(3px); /* Небольшой сдвиг при ховере */
+}
+
+.sidebar-button.active {
+    background-color: var(--sidebar-active-bg-color);
+    color: var(--sidebar-active-text-color);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Тень для активной кнопки */
+    transform: translateX(0); /* Убираем сдвиг, если он был при ховере */
+}
+.sidebar-button.active:hover {
+    background-color: var(--sidebar-active-bg-color); /* Чтобы не менялся цвет при ховере на активной */
+}
+
+
+.main-content {
+    flex-grow: 1;
+    padding: 35px 40px; /* Увеличим отступы */
+    background-color: var(--main-bg-color);
+    overflow-y: auto;
+}
+
+.main-content h1 {
+    color: var(--header-text-color);
+    font-size: 30px; /* Чуть больше */
+    margin-bottom: 30px;
+    font-weight: 700; /* Жирнее */
+}
+
+.filters {
+    background-color: var(--card-bg-color);
+    padding: 20px 25px;
+    border-radius: var(--border-radius-lg); /* Более скругленные углы */
+    margin-bottom: 30px;
+    box-shadow: var(--card-shadow);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border: 1px solid var(--card-border-color); /* Добавим тонкую границу */
+}
+
+.filters label {
+    font-weight: 600;
+    color: var(--primary-text-color);
+}
+
+.filters select, .filters button {
+    padding: 10px 15px; /* Увеличим паддинг */
+    border: 1px solid var(--sidebar-border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 14px;
+    background-color: #fff;
+    transition: border-color var(--transition-speed) var(--transition-timing), box-shadow var(--transition-speed) var(--transition-timing);
+}
+.filters select:focus, .filters button:focus {
+    outline: none;
+    border-color: var(--sidebar-active-bg-color);
+    box-shadow: 0 0 0 2px rgba(61, 90, 120, 0.2); /* Обводка при фокусе */
+}
+
+
+.filters select {
+    min-width: 180px;
+}
+
+.filters button {
+    background-color: var(--button-primary-bg);
+    color: var(--button-primary-text);
+    cursor: pointer;
+    font-weight: 500;
+    border: none;
+    transition: background-color var(--transition-speed) var(--transition-timing), transform 0.1s ease-out;
+}
+
+.filters button:hover {
+    background-color: var(--button-hover-bg);
+    transform: translateY(-1px); /* Легкий подъем кнопки */
+}
+.filters button:active {
+    transform: translateY(0px); /* Возвращаем на место при клике */
+}
+
+
+.tickets-list {
+    display: grid;
+    gap: 25px;
+}
+
+.ticket-card {
+    background-color: var(--card-bg-color);
+    border: 1px solid transparent; /* Убираем видимую границу, тень будет основной */
+    border-radius: var(--border-radius-lg);
+    padding: 20px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: var(--card-shadow);
+    transition: box-shadow var(--transition-speed) var(--transition-timing),
+                transform var(--transition-speed) var(--transition-timing),
+                border-color var(--transition-speed) var(--transition-timing);
+    position: relative; /* Для псевдо-элементов, если понадобятся */
+}
+
+.ticket-card:hover {
+    box-shadow: var(--card-hover-shadow);
+    transform: translateY(-4px); /* Более заметный подъем */
+    border-color: var(--sidebar-active-bg-color); /* Подсветка рамки при ховере */
+}
+
+.ticket-card-info {
+    flex-grow: 1;
+    padding-right: 15px; /* Отступ от стрелки */
+}
+
+.ticket-card-title {
+    font-size: 17px; /* Чуть крупнее */
+    font-weight: 600;
+    color: var(--primary-text-color);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Расстояние между темой и статусом */
+}
+
+.ticket-card-title .status-badge {
+    font-size: 10px; /* Чуть меньше для компактности */
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: var(--border-radius-lg);
+    text-transform: uppercase;
+    letter-spacing: 0.5px; /* Небольшой разряд */
+    line-height: 1; /* Убираем лишнюю высоту */
+}
+
+.status-badge.open {
+    background-color: var(--accent-color-open-bg);
+    color: var(--accent-color-open);
+    border: 1px solid var(--accent-color-open); /* Тонкая рамка в цвет текста */
+}
+.status-badge.closed {
+    background-color: var(--accent-color-closed-bg);
+    color: var(--accent-color-closed);
+    border: 1px solid var(--accent-color-closed);
+}
+.status-badge.waiting_for_user {
+    background-color: var(--accent-color-waiting-bg);
+    color: var(--accent-color-waiting);
+    border: 1px solid var(--accent-color-waiting);
+}
+/* Добавьте другие статусы */
+
+
+.ticket-card-summary {
+    font-size: 14px;
+    color: var(--secondary-text-color);
+    margin-bottom: 10px;
+    line-height: 1.5; /* Улучшение читаемости */
+    /* Для многострочного обрезания текста, если нужно: */
+    /* display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden; */
+}
+.ticket-card-meta {
+    font-size: 12px;
+    color: #888;
+    display: flex; /* Для лучшего выравнивания */
+    gap: 15px; /* Расстояние между мета-данными */
+}
+
+
+.ticket-card-action .arrow {
+    font-size: 24px; /* Крупнее стрелка */
+    color: var(--secondary-text-color);
+    transition: transform var(--transition-speed) var(--transition-timing);
+}
+.ticket-card:hover .ticket-card-action .arrow {
+    transform: translateX(3px); /* Сдвиг стрелки при ховере на карточку */
+    color: var(--sidebar-active-bg-color); /* Меняем цвет стрелки */
+}
+
+/* Стили для таблицы (если используется) */
+/* ... оставьте или доработайте стили таблицы по аналогии с карточками ... */
+table {
+    width: 100%;
+    border-collapse: separate; /* Используем separate для border-spacing и border-radius на ячейках */
+    border-spacing: 0;
+    margin-bottom: 30px;
+    background-color: var(--card-bg-color);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--table-border-color);
+}
+
+th, td {
+    padding: 14px 18px; /* Увеличим паддинг */
+    text-align: left;
+    font-size: 14px;
+    border-bottom: 1px solid var(--table-border-color);
+}
+th:last-child, td:last-child {
+    border-right: none;
+}
+tr:last-child td {
+    border-bottom: none;
+}
+
+th {
+    background-color: var(--table-header-bg);
+    font-weight: 600;
+    color: var(--secondary-text-color);
+    text-transform: uppercase;
+    font-size: 11px; /* Мельче заголовки таблицы */
+    letter-spacing: 0.5px;
+}
+
+tbody tr {
+    transition: background-color var(--transition-speed) var(--transition-timing);
+}
+tbody tr:hover {
+    background-color: #f1f5f9; /* Более заметный ховер для строк таблицы */
+}
+
+td .status-badge {
+    font-size: 10px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: var(--border-radius-lg);
+    text-transform: uppercase;
+    display: inline-block;
+    letter-spacing: 0.5px;
+    line-height: 1;
+}
+
+
+.pagination {
+    margin-top: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.pagination button, .pagination span {
+    margin: 0 4px; /* Чуть меньше отступы */
+    padding: 9px 14px;
+    border: 1px solid var(--sidebar-border-color);
+    border-radius: var(--border-radius-md);
+    background-color: #fff;
+    color: var(--primary-text-color);
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color var(--transition-speed) var(--transition-timing),
+                color var(--transition-speed) var(--transition-timing),
+                box-shadow var(--transition-speed) var(--transition-timing),
+                transform 0.1s ease-out;
+}
+.pagination button:hover:not(:disabled) {
+    background-color: var(--sidebar-hover-bg-color);
+    border-color: #cbd5e0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.pagination button:active:not(:disabled) {
+    transform: translateY(1px);
+}
+.pagination button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #e9ecef;
+}
+.pagination span {
+    border: none;
+    background-color: transparent;
+    padding: 9px 8px;
+    cursor: default;
+    font-weight: normal;
+}
+
+
+.loading, .error {
+    padding: 18px;
+    text-align: center;
+    border-radius: var(--border-radius-md);
+    margin-bottom: 25px;
+    font-size: 15px;
+}
+.loading {
+    background-color: #e2e8f0;
+    color: var(--secondary-text-color);
+}
+.error {
+    background-color: var(--accent-color-closed-bg);
+    color: var(--accent-color-closed);
+    border: 1px solid var(--accent-color-closed);
+}
+
+
+@media (max-width: 992px) { /* Изменим точку для сайдбара */
+    .sidebar {
+        /* Можно сделать сайдбар скрываемым или фиксированным на мобильных */
+        /* Для примера, просто уменьшим его */
+        width: 220px;
+    }
+     .main-content {
+        padding: 25px;
+    }
+}
+
+@media (max-width: 768px) {
+    .admin-layout {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+        padding: 15px;
+    }
+    .sidebar-button {
+        padding: 12px 15px; /* Вернем паддинг для мобильных кнопок */
+    }
+    .main-content {
+        padding: 20px 15px;
+    }
+    .main-content h1 {
+        font-size: 24px;
+    }
+    .filters {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 15px;
+    }
+    .filters select, .filters button {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    .ticket-card {
+        padding: 15px;
+    }
+    .ticket-card-title {
+        font-size: 16px;
+    }
+}
+    </style>
+</head>
+<body>
+
+    <h1>Заявки в Тех. поддержке</h1>
+
+    <div class="filters">
+        <label for="statusFilter">Статус:</label>
+        <select id="statusFilter">
+            <option value="all">Все</option>
+            <option value="open" selected>Открытые</option>
+            <option value="closed">Закрытые</option>
+            <option value="waiting_for_user">Ожидают ответа пользователя</option>
+            <option value="in_progress">В работе</option>
+            <option value="reopened">Переоткрытые</option>
+        </select>
+        <button id="applyFilterBtn">Применить фильтр</button>
+    </div>
+
+    <div id="loadingIndicator" class="loading" style="display: none;">Загрузка заявок...</div>
+    <div id="errorMessages" class="error"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Номер</th>
+                <th>Тема</th>
+                <th>Статус</th>
+                <th>Пользователь</th>
+                <th>Email</th>
+                <th>Компания</th>
+                <th>Создана</th>
+                <th>Обновлена</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody id="ticketsTableBody">
+        </tbody>
+    </table>
+
+    <div class="pagination" id="paginationControls">
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001';
+        const ticketsTableBody = document.getElementById('ticketsTableBody');
+        const statusFilterSelect = document.getElementById('statusFilter');
+        const applyFilterBtn = document.getElementById('applyFilterBtn');
+        const paginationControls = document.getElementById('paginationControls');
+        const errorMessagesDiv = document.getElementById('errorMessages');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+
+        let currentPage = 1;
+        const itemsPerPage = 10; // Соответствует limit на сервере
+
+        function getAdminToken() {
+            return localStorage.getItem('adminAuthToken'); // Убедитесь, что ключ совпадает
+        }
+
+        // Функция для отображения ошибки
+        function displayError(message) {
+            errorMessagesDiv.textContent = message;
+            errorMessagesDiv.style.display = 'block';
+        }
+
+        // Функция для очистки ошибок
+        function clearError() {
+            errorMessagesDiv.textContent = '';
+            errorMessagesDiv.style.display = 'none';
+        }
+
+        // Функция для отображения индикатора загрузки
+        function showLoading(isLoading) {
+            loadingIndicator.style.display = isLoading ? 'block' : 'none';
+        }
+
+        // Функция для получения и отображения заявок
+        async function fetchAndDisplayTickets(status = 'open', page = 1) {
+            clearError();
+            showLoading(true);
+            ticketsTableBody.innerHTML = ''; // Очищаем таблицу перед новой загрузкой
+            paginationControls.innerHTML = ''; // Очищаем пагинацию
+
+            const token = getAdminToken();
+            if (!token) {
+                displayError('Ошибка авторизации: токен администратора не найден. Пожалуйста, войдите снова.');
+                showLoading(false);
+                // Можно добавить перенаправление на страницу входа:
+                // window.location.href = '/admin-login.html';
+                return;
+            }
+
+            const params = new URLSearchParams({
+                status: status,
+                page: page,
+                limit: itemsPerPage,
+                sortBy: 'updated_at', // Можно сделать настраиваемым
+                sortOrder: 'DESC'
+            });
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/tickets?${params.toString()}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json' // Необязателен для GET, но не повредит
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: `Ошибка сервера: ${response.status}` }));
+                    if (response.status === 401 || response.status === 403) {
+                        displayError(`Ошибка авторизации (${response.status}): ${errorData.message || 'Пожалуйста, войдите снова.'}`);
+                        // Возможно, удалить невалидный токен
+                        // localStorage.removeItem('adminAuthToken');
+                        // window.location.href = '/admin-login.html';
+                    } else {
+                        displayError(`Ошибка загрузки заявок: ${errorData.message || response.statusText}`);
+                    }
+                    showLoading(false);
+                    return;
+                }
+
+                const data = await response.json();
+                currentPage = data.pagination.currentPage; // Обновляем текущую страницу
+
+                if (data.tickets && data.tickets.length > 0) {
+                    data.tickets.forEach(ticket => {
+
+                        const row = ticketsTableBody.insertRow();
+                        row.innerHTML = `
+                            <td>${ticket.ticket_number}</td>
+                            <td>${ticket.subject}</td>
+                            <td>${adapterStatus(ticket.status)}</td>
+                            <td>${ticket.user_fio || 'N/A'}</td>
+                            <td>${ticket.user_email || 'N/A'}</td>
+                            <td>${ticket.user_company || 'N/A'}</td>
+                            <td>${new Date(ticket.created_at).toLocaleString()}</td>
+                            <td>${new Date(ticket.updated_at).toLocaleString()}</td>
+                            <td><button onclick="viewTicketDetails('${ticket.ticket_number}')">Просмотр</button></td>
+                        `;
+                    });
+                } else {
+                    ticketsTableBody.innerHTML = '<tr><td colspan="9">Заявки не найдены.</td></tr>';
+                }
+
+                renderPagination(data.pagination);
+
+            } catch (error) {
+                console.error('Полная ошибка при загрузке заявок:', error);
+                displayError('Произошла ошибка при загрузке заявок. Пожалуйста, проверьте консоль.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function adapterStatus(arrStatus) {
+            if(!arrStatus) {
+                arrStatus = 'Статус неназначен';
+                console.error('Пусто');
+                return;
+            }
+            if(arrStatus === 'open') arrStatus = 'Открыта';
+            if(arrStatus === 'waiting_for_user') arrStatus = 'Ожидает ответа';
+            if(arrStatus === 'closed') arrStatus = 'Закрыта';
+            console.log(arrStatus);
+            return arrStatus;
+        }
+
+        // Функция для рендеринга пагинации
+        function renderPagination(paginationData) {
+            if (!paginationData || paginationData.totalPages <= 1) {
+                paginationControls.innerHTML = '';
+                return;
+            }
+
+            // Кнопка "Назад"
+            const prevButton = document.createElement('button');
+            prevButton.textContent = 'Назад';
+            prevButton.disabled = paginationData.currentPage === 1;
+            prevButton.addEventListener('click', () => {
+                if (paginationData.currentPage > 1) {
+                    fetchAndDisplayTickets(statusFilterSelect.value, paginationData.currentPage - 1);
+                }
+            });
+            paginationControls.appendChild(prevButton);
+
+            // Информация о текущей странице
+            const pageInfo = document.createElement('span');
+            pageInfo.textContent = ` Страница ${paginationData.currentPage} из ${paginationData.totalPages} `;
+            paginationControls.appendChild(pageInfo);
+
+            // Кнопка "Вперед"
+            const nextButton = document.createElement('button');
+            nextButton.textContent = 'Вперед';
+            nextButton.disabled = paginationData.currentPage === paginationData.totalPages;
+            nextButton.addEventListener('click', () => {
+                if (paginationData.currentPage < paginationData.totalPages) {
+                    fetchAndDisplayTickets(statusFilterSelect.value, paginationData.currentPage + 1);
+                }
+            });
+            paginationControls.appendChild(nextButton);
+        }
+
+        // Функция для просмотра деталей заявки (заглушка)
+        function viewTicketDetails(ticketNumber) {
+            // Здесь должна быть логика перехода на страницу деталей заявки
+            // Например: window.location.href = `/admin/ticket-details.html?ticketNumber=${ticketNumber}`;
+            alert(`Просмотр деталей заявки #${ticketNumber}`);
+            console.log(`Переход к деталям заявки: ${ticketNumber}`);
+        }
+
+        // Обработчик для кнопки "Применить фильтр"
+        applyFilterBtn.addEventListener('click', () => {
+            fetchAndDisplayTickets(statusFilterSelect.value, 1); // При смене фильтра всегда начинаем с 1-й страницы
+        });
+
+        // Начальная загрузка заявок при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = getAdminToken();
+            if (!token) {
+                // Если токена нет, можно сразу перенаправить на страницу входа
+                // displayError('Вы не авторизованы. Пожалуйста, войдите.');
+                // alert('Вы не авторизованы. Перенаправление на страницу входа.');
+                // window.location.href = 'admin-login.html'; // Укажите путь к вашей странице входа
+                console.warn("Токен администратора не найден. Загрузка данных не будет выполнена.");
+                displayError("Для доступа к этой странице необходимо войти как администратор.");
+
+            } else {
+                fetchAndDisplayTickets(statusFilterSelect.value, currentPage);
+            }
+        });
+    </script>
+</body>
+</html>

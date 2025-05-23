@@ -36,3 +36,17 @@ function calculatePizza(countPizza: number, hydrationDough: number): Pizza | {er
 
 const pizza = calculatePizza(2, 55);
 console.log(pizza)
+
+type Status = string;
+type StatusStateServer = "open" | "closed" | "waiting_for_user";
+type StatusStateClient = 'Открыта' | 'Закрыта' | 'Ожидает ответа' | 'Статус не назначен';
+
+function statusAdapter(status: StatusStateServer): Status {
+    if(!status) {
+        status = 'Статус не назначен'
+    }
+
+    if(status === "open") {
+        
+    }
+}

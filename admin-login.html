@@ -9,12 +9,15 @@
 <body class="body">
     <section class="auth-tech">
         <div class="container">
-            <form class="form-auth-tech">
+            <form id="adminLoginForm" class="form-auth-tech">
                 <div class="form-auth-title">Вход в Техническую поддержку</div>
-                <input class="tech-pwd-input" id="tech-password-input" type="password" name="password" placeholder="Введите пароль">
-                <button class="btn-auth-tech">Войти</button>
+                <input class="tech-pwd-input" id="password" type="password" name="password" placeholder="Введите пароль">
+                <button class="btn-auth-tech" id="loginButton">Войти</button>
             </form>
         </div>
+        <div id="loadingMessage"></div>
+        <div id="errorMessage"></div>
     </section>
+<script src="./client/admin-auth.js"></script>
 </body>
 </html>
