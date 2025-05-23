@@ -1,4 +1,5 @@
 const API_BASE_URL = 'http://localhost:3001';
+const SERVER_API = 'https://devsanya.ru';
 const adminLoginForm = document.getElementById('adminLoginForm');
 const passwordInput = document.getElementById('password');
 const errorMessageDiv = document.getElementById('errorMessage');
@@ -25,7 +26,7 @@ adminLoginForm.addEventListener('submit', async function(event) {
     clearMessage();
 
     try {
-        const response = await fetch(`${API_BASE_URL}/auth-tech`, {
+        const response = await fetch(`${API_BASE_URL}/api/auth-tech`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

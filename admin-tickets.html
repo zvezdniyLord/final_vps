@@ -473,6 +473,10 @@ td .status-badge {
             <option value="in_progress">В работе</option>
             <option value="reopened">Переоткрытые</option>
         </select>
+        <label for="userFilter">Пользователь:</label>
+        <select id="userFilter">
+            <option value="all" selected>Все пользователи</option>
+        </select>
         <button id="applyFilterBtn">Применить фильтр</button>
     </div>
 
@@ -501,194 +505,308 @@ td .status-badge {
     </div>
 
     <script>
-        const API_BASE_URL = 'http://localhost:3001';
-        const ticketsTableBody = document.getElementById('ticketsTableBody');
-        const statusFilterSelect = document.getElementById('statusFilter');
-        const applyFilterBtn = document.getElementById('applyFilterBtn');
-        const paginationControls = document.getElementById('paginationControls');
-        const errorMessagesDiv = document.getElementById('errorMessages');
-        const loadingIndicator = document.getElementById('loadingIndicator');
+    // Файл: admin-tickets-client.js
 
-        let currentPage = 1;
-        const itemsPerPage = 10; // Соответствует limit на сервере
+const API_BASE_URL = 'http://localhost:3001'; // ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ ДОМЕН API
+const TOKEN_KEY = 'adminAuthToken'; // Ключ для токена в localStorage
+const API_SERVER = 'https://devsanya.ru';
+// Элементы DOM
+const ticketsTableBody = document.getElementById('ticketsTableBody'); // Для таблицы
+const ticketsListDiv = document.getElementById('ticketsList'); // Для карточек, если используется
+const statusFilterSelect = document.getElementById('statusFilter');
+const userFilterSelect = document.getElementById('userFilter');
+const applyFilterBtn = document.getElementById('applyFilterBtn');
+const paginationControls = document.getElementById('paginationControls');
+const errorMessagesDiv = document.getElementById('errorMessages');
+const loadingIndicator = document.getElementById('loadingIndicator');
 
-        function getAdminToken() {
-            return localStorage.getItem('adminAuthToken'); // Убедитесь, что ключ совпадает
+let currentPage = 1;
+const itemsPerPage = 10; // Должно соответствовать 'limit' на сервере
+
+// --- Функции для работы с API и UI ---
+
+// Получение токена администратора из localStorage
+function getAdminToken() {
+    return localStorage.getItem(TOKEN_KEY);
+}
+
+// Отображение сообщений об ошибках или успехе
+function displayMessage(message, isError = false, targetDiv = errorMessagesDiv) {
+    targetDiv.textContent = message;
+    targetDiv.style.color = isError ? 'red' : 'green'; // Или другой цвет для успеха
+    targetDiv.style.display = 'block';
+}
+
+// Очистка сообщений
+function clearMessage(targetDiv = errorMessagesDiv) {
+    targetDiv.textContent = '';
+    targetDiv.style.display = 'none';
+}
+
+// Показать/скрыть индикатор загрузки
+function showLoading(isLoading) {
+    if (loadingIndicator) {
+        loadingIndicator.style.display = isLoading ? 'block' : 'none';
+    }
+    if (applyFilterBtn) { // Блокируем кнопку фильтра во время загрузки
+        applyFilterBtn.disabled = isLoading;
+    }
+}
+
+// Загрузка списка пользователей для фильтра
+async function loadUsersForFilter() {
+    const token = getAdminToken();
+    if (!token || !userFilterSelect) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/admin/userslist`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) {
+            console.error('Ошибка загрузки списка пользователей для фильтра. Статус:', response.status);
+            // Можно вывести сообщение пользователю, если это критично
+            return;
         }
-
-        // Функция для отображения ошибки
-        function displayError(message) {
-            errorMessagesDiv.textContent = message;
-            errorMessagesDiv.style.display = 'block';
-        }
-
-        // Функция для очистки ошибок
-        function clearError() {
-            errorMessagesDiv.textContent = '';
-            errorMessagesDiv.style.display = 'none';
-        }
-
-        // Функция для отображения индикатора загрузки
-        function showLoading(isLoading) {
-            loadingIndicator.style.display = isLoading ? 'block' : 'none';
-        }
-
-        // Функция для получения и отображения заявок
-        async function fetchAndDisplayTickets(status = 'open', page = 1) {
-            clearError();
-            showLoading(true);
-            ticketsTableBody.innerHTML = ''; // Очищаем таблицу перед новой загрузкой
-            paginationControls.innerHTML = ''; // Очищаем пагинацию
-
-            const token = getAdminToken();
-            if (!token) {
-                displayError('Ошибка авторизации: токен администратора не найден. Пожалуйста, войдите снова.');
-                showLoading(false);
-                // Можно добавить перенаправление на страницу входа:
-                // window.location.href = '/admin-login.html';
-                return;
+        const data = await response.json();
+        if (data.users) {
+            // Очищаем предыдущие опции (кроме "Все пользователи")
+            while (userFilterSelect.options.length > 1) {
+                userFilterSelect.remove(1);
             }
-
-            const params = new URLSearchParams({
-                status: status,
-                page: page,
-                limit: itemsPerPage,
-                sortBy: 'updated_at', // Можно сделать настраиваемым
-                sortOrder: 'DESC'
+            data.users.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.id;
+                option.textContent = `${user.fio} (${user.email || 'N/A'})`;
+                userFilterSelect.appendChild(option);
             });
+        }
+    } catch (error) {
+        console.error('Ошибка при получении списка пользователей:', error);
+        displayMessage('Не удалось загрузить список пользователей для фильтра.', true);
+    }
+}
 
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/admin/tickets?${params.toString()}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json' // Необязателен для GET, но не повредит
-                    }
-                });
+// Основная функция для получения и отображения заявок
+async function fetchAndDisplayTickets(status = 'open', page = 1, userId = 'all') {
+    clearMessage();
+    showLoading(true);
 
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: `Ошибка сервера: ${response.status}` }));
-                    if (response.status === 401 || response.status === 403) {
-                        displayError(`Ошибка авторизации (${response.status}): ${errorData.message || 'Пожалуйста, войдите снова.'}`);
-                        // Возможно, удалить невалидный токен
-                        // localStorage.removeItem('adminAuthToken');
-                        // window.location.href = '/admin-login.html';
-                    } else {
-                        displayError(`Ошибка загрузки заявок: ${errorData.message || response.statusText}`);
-                    }
-                    showLoading(false);
-                    return;
-                }
+    // Очистка перед новой загрузкой
+    if (ticketsTableBody) ticketsTableBody.innerHTML = '';
+    if (ticketsListDiv) ticketsListDiv.innerHTML = '';
+    if (paginationControls) paginationControls.innerHTML = '';
 
-                const data = await response.json();
-                currentPage = data.pagination.currentPage; // Обновляем текущую страницу
+    const token = getAdminToken();
+    if (!token) {
+        displayMessage('Ошибка авторизации: токен администратора не найден. Пожалуйста, войдите снова.', true);
+        showLoading(false);
+        // Пример перенаправления:
+        // if (window.location.pathname !== '/admin-login.html') { // Чтобы не было цикла
+        //     window.location.href = 'admin-login.html';
+        // }
+        return;
+    }
 
-                if (data.tickets && data.tickets.length > 0) {
-                    data.tickets.forEach(ticket => {
+    const params = new URLSearchParams({
+        status: status,
+        page: page,
+        limit: itemsPerPage,
+        sortBy: 'updated_at', // Можно сделать настраиваемым через UI
+        sortOrder: 'DESC'     // Можно сделать настраиваемым через UI
+    });
 
-                        const row = ticketsTableBody.insertRow();
-                        row.innerHTML = `
-                            <td>${ticket.ticket_number}</td>
-                            <td>${ticket.subject}</td>
-                            <td>${adapterStatus(ticket.status)}</td>
-                            <td>${ticket.user_fio || 'N/A'}</td>
-                            <td>${ticket.user_email || 'N/A'}</td>
-                            <td>${ticket.user_company || 'N/A'}</td>
-                            <td>${new Date(ticket.created_at).toLocaleString()}</td>
-                            <td>${new Date(ticket.updated_at).toLocaleString()}</td>
-                            <td><button onclick="viewTicketDetails('${ticket.ticket_number}')">Просмотр</button></td>
-                        `;
-                    });
-                } else {
-                    ticketsTableBody.innerHTML = '<tr><td colspan="9">Заявки не найдены.</td></tr>';
-                }
+    if (userId && userId !== 'all') {
+        params.append('userId', userId);
+    }
 
-                renderPagination(data.pagination);
-
-            } catch (error) {
-                console.error('Полная ошибка при загрузке заявок:', error);
-                displayError('Произошла ошибка при загрузке заявок. Пожалуйста, проверьте консоль.');
-            } finally {
-                showLoading(false);
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/admin/tickets?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
             }
-        }
-
-        function adapterStatus(arrStatus) {
-            if(!arrStatus) {
-                arrStatus = 'Статус неназначен';
-                console.error('Пусто');
-                return;
-            }
-            if(arrStatus === 'open') arrStatus = 'Открыта';
-            if(arrStatus === 'waiting_for_user') arrStatus = 'Ожидает ответа';
-            if(arrStatus === 'closed') arrStatus = 'Закрыта';
-            console.log(arrStatus);
-            return arrStatus;
-        }
-
-        // Функция для рендеринга пагинации
-        function renderPagination(paginationData) {
-            if (!paginationData || paginationData.totalPages <= 1) {
-                paginationControls.innerHTML = '';
-                return;
-            }
-
-            // Кнопка "Назад"
-            const prevButton = document.createElement('button');
-            prevButton.textContent = 'Назад';
-            prevButton.disabled = paginationData.currentPage === 1;
-            prevButton.addEventListener('click', () => {
-                if (paginationData.currentPage > 1) {
-                    fetchAndDisplayTickets(statusFilterSelect.value, paginationData.currentPage - 1);
-                }
-            });
-            paginationControls.appendChild(prevButton);
-
-            // Информация о текущей странице
-            const pageInfo = document.createElement('span');
-            pageInfo.textContent = ` Страница ${paginationData.currentPage} из ${paginationData.totalPages} `;
-            paginationControls.appendChild(pageInfo);
-
-            // Кнопка "Вперед"
-            const nextButton = document.createElement('button');
-            nextButton.textContent = 'Вперед';
-            nextButton.disabled = paginationData.currentPage === paginationData.totalPages;
-            nextButton.addEventListener('click', () => {
-                if (paginationData.currentPage < paginationData.totalPages) {
-                    fetchAndDisplayTickets(statusFilterSelect.value, paginationData.currentPage + 1);
-                }
-            });
-            paginationControls.appendChild(nextButton);
-        }
-
-        // Функция для просмотра деталей заявки (заглушка)
-        function viewTicketDetails(ticketNumber) {
-            // Здесь должна быть логика перехода на страницу деталей заявки
-            // Например: window.location.href = `/admin/ticket-details.html?ticketNumber=${ticketNumber}`;
-            alert(`Просмотр деталей заявки #${ticketNumber}`);
-            console.log(`Переход к деталям заявки: ${ticketNumber}`);
-        }
-
-        // Обработчик для кнопки "Применить фильтр"
-        applyFilterBtn.addEventListener('click', () => {
-            fetchAndDisplayTickets(statusFilterSelect.value, 1); // При смене фильтра всегда начинаем с 1-й страницы
         });
 
-        // Начальная загрузка заявок при загрузке страницы
-        document.addEventListener('DOMContentLoaded', () => {
-            const token = getAdminToken();
-            if (!token) {
-                // Если токена нет, можно сразу перенаправить на страницу входа
-                // displayError('Вы не авторизованы. Пожалуйста, войдите.');
-                // alert('Вы не авторизованы. Перенаправление на страницу входа.');
-                // window.location.href = 'admin-login.html'; // Укажите путь к вашей странице входа
-                console.warn("Токен администратора не найден. Загрузка данных не будет выполнена.");
-                displayError("Для доступа к этой странице необходимо войти как администратор.");
-
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: `Ошибка сервера: ${response.status}. Пожалуйста, проверьте консоль.` }));
+            if (response.status === 401 || response.status === 403) {
+                displayMessage(`Ошибка авторизации (${response.status}): ${errorData.message || 'Сессия истекла или недействительна. Пожалуйста, войдите снова.'}`, true);
+                // localStorage.removeItem(TOKEN_KEY);
+                // if (window.location.pathname !== '/admin-login.html') { window.location.href = 'admin-login.html'; }
             } else {
-                fetchAndDisplayTickets(statusFilterSelect.value, currentPage);
+                displayMessage(`Ошибка загрузки заявок: ${errorData.message || response.statusText}`, true);
             }
-        });
+            showLoading(false);
+            return;
+        }
+
+        const data = await response.json();
+        currentPage = data.pagination.currentPage;
+
+        if (data.tickets && data.tickets.length > 0) {
+            data.tickets.forEach(renderTicket); // Используем функцию для рендера каждой заявки
+        } else {
+            const noTicketsMessage = '<p style="text-align: center; padding: 20px; color: var(--secondary-text-color);">Заявки с указанными фильтрами не найдены.</p>';
+            if (ticketsListDiv) { // Если используем карточки
+                ticketsListDiv.innerHTML = noTicketsMessage;
+            } else if (ticketsTableBody) { // Если используем таблицу
+                ticketsTableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 20px;">Заявки с указанными фильтрами не найдены.</td></tr>`;
+            }
+        }
+
+        renderPagination(data.pagination);
+
+    } catch (error) {
+        console.error('Полная ошибка при загрузке заявок:', error);
+        displayMessage('Произошла сетевая ошибка или непредвиденная ошибка при загрузке заявок. Пожалуйста, проверьте консоль.', true);
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Функция для рендера одной заявки (адаптируйте под карточки или таблицу)
+function renderTicket(ticket) {
+    // ВАРИАНТ С КАРТОЧКАМИ (если ticketsListDiv существует)
+    if (ticketsListDiv) {
+        const card = document.createElement('div');
+        card.className = 'ticket-card';
+        card.onclick = () => viewTicketDetails(ticket.ticket_number);
+
+        let statusClass = ticket.status.toLowerCase().replace(/\s+/g, '_');
+        let statusText = ticket.status.toUpperCase(); // Или ваш локализованный текст
+
+        card.innerHTML = `
+            <div class="ticket-card-info">
+                <div class="ticket-card-title">
+                    Тема: ${escapeHtml(ticket.subject)}
+                    <span class="status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusText)}</span>
+                </div>
+                <div class="ticket-card-summary">
+                    ${escapeHtml(ticket.first_message_snippet) || 'Нет описания'}
+                </div>
+                <div class="ticket-card-meta">
+                    <span>#${escapeHtml(ticket.ticket_number)}</span>
+                    <span>Пользователь: ${escapeHtml(ticket.user_fio) || 'N/A'}</span>
+                    <span>Обновлено: ${new Date(ticket.updated_at).toLocaleString()}</span>
+                </div>
+            </div>
+            <div class="ticket-card-action">
+                <span class="arrow">&rsaquo;</span>
+            </div>
+        `;
+        ticketsListDiv.appendChild(card);
+    }
+    // ВАРИАНТ С ТАБЛИЦЕЙ (если ticketsTableBody существует)
+    else if (ticketsTableBody) {
+        const row = ticketsTableBody.insertRow();
+        let statusClass = ticket.status.toLowerCase().replace(/\s+/g, '_');
+        let statusText = ticket.status.toUpperCase();
+
+        row.innerHTML = `
+            <td>${escapeHtml(ticket.ticket_number)}</td>
+            <td>${escapeHtml(ticket.subject)}</td>
+            <td><span class="status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusText)}</span></td>
+            <td>${escapeHtml(ticket.user_fio) || 'N/A'}</td>
+            <td>${escapeHtml(ticket.user_email) || 'N/A'}</td>
+            <td>${escapeHtml(ticket.user_company) || 'N/A'}</td>
+            <td>${new Date(ticket.created_at).toLocaleString()}</td>
+            <td>${new Date(ticket.updated_at).toLocaleString()}</td>
+            <td><button class="action-button view-button" onclick="viewTicketDetails('${escapeHtml(ticket.ticket_number)}')">Просмотр</button></td>
+        `;
+         // Добавьте стили для .action-button и .view-button в CSS, если нужно
+    }
+}
+// Вспомогательная функция для экранирования HTML (простая версия)
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return unsafe; // Если не строка, возвращаем как есть
+    return unsafe
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+}
+
+// Функция для рендеринга пагинации
+function renderPagination(paginationData) {
+    if (!paginationControls || !paginationData || paginationData.totalPages <= 1) {
+        if(paginationControls) paginationControls.innerHTML = '';
+        return;
+    }
+    paginationControls.innerHTML = ''; // Очищаем перед рендером
+
+    const prevButton = document.createElement('button');
+    prevButton.textContent = 'Назад';
+    prevButton.disabled = paginationData.currentPage === 1;
+    prevButton.addEventListener('click', () => {
+        if (paginationData.currentPage > 1) {
+            fetchAndDisplayTickets(statusFilterSelect.value, paginationData.currentPage - 1, userFilterSelect.value);
+        }
+    });
+    paginationControls.appendChild(prevButton);
+
+    const pageInfo = document.createElement('span');
+    pageInfo.textContent = ` Страница ${paginationData.currentPage} из ${paginationData.totalPages} `;
+    paginationControls.appendChild(pageInfo);
+
+    const nextButton = document.createElement('button');
+    nextButton.textContent = 'Вперед';
+    nextButton.disabled = paginationData.currentPage === paginationData.totalPages;
+    nextButton.addEventListener('click', () => {
+        if (paginationData.currentPage < paginationData.totalPages) {
+            fetchAndDisplayTickets(statusFilterSelect.value, paginationData.currentPage + 1, userFilterSelect.value);
+        }
+    });
+    paginationControls.appendChild(nextButton);
+}
+
+// Функция для перехода к деталям заявки (заглушка)
+function viewTicketDetails(ticketNumber) {
+    alert(`Переход к деталям заявки #${ticketNumber}. Реализуйте эту функцию.`);
+    console.log(`Запрошен просмотр деталей для заявки: ${ticketNumber}`);
+    // Пример: window.location.href = `/admin/ticket-view.html?number=${ticketNumber}`;
+}
+
+// --- Инициализация и обработчики событий ---
+
+// Обработчик для кнопки "Применить фильтр"
+if (applyFilterBtn) {
+    applyFilterBtn.addEventListener('click', () => {
+        const selectedStatus = statusFilterSelect ? statusFilterSelect.value : 'all';
+        const selectedUserId = userFilterSelect ? userFilterSelect.value : 'all';
+        currentPage = 1; // Сбрасываем на первую страницу при новом фильтре
+        fetchAndDisplayTickets(selectedStatus, currentPage, selectedUserId);
+    });
+}
+
+// Начальная загрузка данных при загрузке страницы
+document.addEventListener('DOMContentLoaded', () => {
+    // Проверка наличия необходимых элементов DOM, прежде чем вешать обработчики или вызывать функции
+    if (!statusFilterSelect || !userFilterSelect || !applyFilterBtn || (!ticketsTableBody && !ticketsListDiv) || !paginationControls || !errorMessagesDiv || !loadingIndicator) {
+        console.error("Один или несколько ключевых элементов DOM не найдены. Проверьте HTML-разметку и ID элементов.");
+        displayMessage("Ошибка инициализации страницы: отсутствуют необходимые элементы.", true, document.body); // Отображаем ошибку в теле документа, если основной div ошибки не найден
+        return;
+    }
+
+    const token = getAdminToken();
+    if (!token) {
+        console.warn("Токен администратора не найден. Загрузка данных не будет выполнена.");
+        displayMessage("Для доступа к этой странице необходимо войти как администратор.", true);
+        // Если нужно, добавьте перенаправление на страницу входа:
+        // setTimeout(() => {
+        //    if (window.location.pathname !== '/admin-login.html') { window.location.href = 'admin-login.html'; }
+        // }, 2000);
+        return;
+    }
+
+    loadUsersForFilter(); // Загружаем пользователей для выпадающего списка
+
+    // Начальная загрузка тикетов (например, все открытые от всех пользователей)
+    const initialStatus = statusFilterSelect.value || 'open';
+    const initialUser = userFilterSelect.value || 'all';
+    fetchAndDisplayTickets(initialStatus, currentPage, initialUser);
+});
+
     </script>
 </body>
 </html>

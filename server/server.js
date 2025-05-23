@@ -1983,73 +1983,76 @@ app.post('/auth-tech', superAdminAuthLimiter, async (req, res) => {
 });
 
 app.get('/api/admin/tickets', verifyAdminToken, async (req, res) => {
-    // const adminInfo = req.admin; // Информация из токена, если нужна
-
-    const statusFilter = req.query.status; // 'open', 'closed', 'all', 'waiting_for_user', 'in_progress', 'reopened'
+    const statusFilter = req.query.status;
+    const userIdFilter = req.query.userId;
     const sortBy = req.query.sortBy || 'updated_at';
     const sortOrder = req.query.sortOrder || 'DESC';
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    // Базовые части запросов
     const selectClause = `
         SELECT
-            t.id,
-            t.ticket_number,
-            t.subject,
-            ts.name as status,
-            u.fio as user_fio,
-            u.email as user_email,
-            u.company as user_company,
-            t.created_at,
-            t.updated_at,
-            t.closed_at,
-            (SELECT tm.message FROM ticket_messages tm
-             WHERE tm.ticket_id = t.id
-             ORDER BY tm.created_at ASC LIMIT 1) as first_message_snippet,
-            (SELECT tm.created_at FROM ticket_messages tm
-             WHERE tm.ticket_id = t.id
-             ORDER BY tm.created_at DESC LIMIT 1) as last_message_at
+            t.id, t.ticket_number, t.subject, ts.name as status,
+            u.fio as user_fio, u.email as user_email, u.company as user_company,
+            t.created_at, t.updated_at, t.closed_at,
+            (SELECT tm.message FROM ticket_messages tm WHERE tm.ticket_id = t.id ORDER BY tm.created_at ASC LIMIT 1) as first_message_snippet,
+            (SELECT tm.created_at FROM ticket_messages tm WHERE tm.ticket_id = t.id ORDER BY tm.created_at DESC LIMIT 1) as last_message_at
     `;
     const fromClause = `
         FROM tickets t
         JOIN ticket_statuses ts ON t.status_id = ts.id
         JOIN users u ON t.user_id = u.id
     `;
-    const countSelectClause = `SELECT COUNT(t.id)`; // Считаем по t.id для корректности с JOIN
+    const countSelectClause = `SELECT COUNT(t.id)`;
 
-    let whereClause = '';
-    const queryParams = []; // Параметры для основного запроса (лимит, оффсет и, возможно, статус)
-    const countQueryParams = []; // Параметры для запроса подсчета (только статус, если есть)
+    let whereConditions = []; // <--- ИЗМЕНЕНИЕ: Инициализируем как МАССИВ
+    const queryParams = [];
+    const countQueryParams = [];
 
 
     if (statusFilter && statusFilter !== 'all') {
         if (statusFilter === 'open') {
-            whereClause = `WHERE ts.name != 'closed'`;
+            whereConditions.push(`ts.name != 'closed'`); // <--- ИЗМЕНЕНИЕ: Используем массив
         } else {
-            // Для конкретных статусов (closed, waiting_for_user, in_progress, reopened, etc.)
-            queryParams.push(statusFilter);
-            countQueryParams.push(statusFilter); // Добавляем и для count запроса
-            whereClause = `WHERE ts.name = $${queryParams.length}`; // Параметр будет $1
+            countQueryParams.push(statusFilter); // Добавляем в параметры для count первым
+            queryParams.push(statusFilter);      // Затем в параметры для основного запроса
+            whereConditions.push(`ts.name = $${countQueryParams.length}`); // <--- Используем длину countQueryParams для индекса
         }
     }
 
-    let query = `${selectClause} ${fromClause} ${whereClause}`;
-    let countQuery = `${countSelectClause} ${fromClause} ${whereClause}`; // countQuery использует тот же whereClause
+    if (userIdFilter && userIdFilter !== 'all') {
+        const userIdNum = parseInt(userIdFilter, 10);
+        if (!isNaN(userIdNum)) { // Проверка, что это действительно число
+            countQueryParams.push(userIdNum);
+            queryParams.push(userIdNum);
+            whereConditions.push(`t.user_id = $${countQueryParams.length}`); // <--- Используем длину countQueryParams для индекса
+        } else {
+            console.warn(`Invalid userIdFilter received: ${userIdFilter}`);
+            // Можно вернуть ошибку или просто проигнорировать этот фильтр
+        }
+    }
+
+    let whereClauseString = '';
+    if (whereConditions.length > 0) {
+        whereClauseString = 'WHERE ' + whereConditions.join(' AND ');
+    }
+
+    let query = `${selectClause} ${fromClause} ${whereClauseString}`;
+    let countQuery = `${countSelectClause} ${fromClause} ${whereClauseString}`;
+
 
     const allowedSortByFields = ['ticket_number', 'subject', 'status', 'user_fio', 'created_at', 'updated_at', 'last_message_at'];
     let safeSortByDbField = sortBy;
     if (sortBy === 'status') safeSortByDbField = 'ts.name';
     else if (sortBy === 'user_fio') safeSortByDbField = 'u.fio';
-    else if (!allowedSortByFields.includes(sortBy)) safeSortByDbField = 'updated_at'; // Поле из t по умолчанию
+    else if (allowedSortByFields.includes(sortBy)) safeSortByDbField = `t.${sortBy}`; // Добавляем алиас t. для полей из tickets
+    else safeSortByDbField = 't.updated_at'; // Поле из t по умолчанию
 
-    const safeSortBy = allowedSortByFields.includes(sortBy) ? safeSortByDbField : 't.updated_at';
     const safeSortOrder = (sortOrder.toUpperCase() === 'ASC' || sortOrder.toUpperCase() === 'DESC') ? sortOrder.toUpperCase() : 'DESC';
+    query += ` ORDER BY ${safeSortByDbField} ${safeSortOrder}, t.id ${safeSortOrder}`;
 
-    query += ` ORDER BY ${safeSortBy} ${safeSortOrder}, t.id ${safeSortOrder}`;
-
-    // Добавляем параметры для LIMIT и OFFSET после всех возможных параметров фильтрации
+    // Параметры для LIMIT и OFFSET всегда добавляются последними
     queryParams.push(limit);
     query += ` LIMIT $${queryParams.length}`;
     queryParams.push(offset);
@@ -2058,8 +2061,14 @@ app.get('/api/admin/tickets', verifyAdminToken, async (req, res) => {
     let client;
     try {
         client = await pool.connect();
+        console.log('Executing Query:', query); // Лог для отладки основного запроса
+        console.log('Query Params:', queryParams);  // Лог для отладки параметров основного запроса
+
+        console.log('Executing Count Query:', countQuery); // Лог для отладки запроса подсчета
+        console.log('Count Query Params:', countQueryParams); // Лог для отладки параметров запроса подсчета
+
         const ticketsResult = await client.query(query, queryParams);
-        const totalTicketsResult = await client.query(countQuery, countQueryParams); // Передаем параметры для count
+        const totalTicketsResult = await client.query(countQuery, countQueryParams);
 
         const totalTickets = parseInt(totalTicketsResult.rows[0].count, 10);
 
@@ -2073,12 +2082,31 @@ app.get('/api/admin/tickets', verifyAdminToken, async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error fetching all tickets for admin:', error);
+        console.error('!!! UNHANDLED ERROR in /api/admin/tickets:', error); // Изменил, чтобы было видно в логах
         res.status(500).json({ message: 'Не удалось загрузить список заявок' });
     } finally {
         if (client) client.release();
     }
 });
+
+// Эндпоинт для получения списка пользователей для фильтра в админке
+app.get('/api/admin/userslist', verifyAdminToken, async (req, res) => {
+    let client;
+    try {
+        client = await pool.connect();
+        // Выбираем только необходимые поля, возможно, отсортируем по ФИО
+        const result = await client.query(
+            'SELECT id, fio, email FROM users ORDER BY fio ASC'
+        );
+        res.status(200).json({ users: result.rows });
+    } catch (error) {
+        console.error('Error fetching users list for admin filter:', error);
+        res.status(500).json({ message: 'Не удалось загрузить список пользователей' });
+    } finally {
+        if (client) client.release();
+    }
+});
+
 
 
 // --- Basic Root Route ---
